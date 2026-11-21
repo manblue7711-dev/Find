@@ -2,208 +2,438 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A49">
 <title>Campus Find</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#f7f7f5; --card:#fff; --text:#1c1c1a; --muted:#6b6b66; --line:#e3e3df; --accent:#0f6e56; --warn:#b3261e; color-scheme: light; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --card:#222221; --text:#f2f2ee; --muted:#a0a09a; --line:#333331; --accent:#3ecf9e; --warn:#ff8a80; color-scheme: dark; } }
-  * { box-sizing: border-box; }
-  body { margin:0; font:16px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
-  header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); }
-  h1 { font-size:18px; margin:0; }
-  main { max-width:640px; margin:0 auto; padding:12px 16px 80px; }
-  input, select, textarea, button { font:inherit; width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); margin-bottom:8px; }
-  button { background:var(--accent); color:#fff; border:0; cursor:pointer; font-weight:600; }
-  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
-  button.sm { width:auto; padding:6px 12px; margin:0; }
-  .row { display:flex; gap:8px; } .row > * { flex:1; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; }
-  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--muted); margin-right:4px; }
-  .muted { color:var(--muted); font-size:14px; } .err { color:var(--warn); }
-  img.thumb { width:100%; max-height:180px; object-fit:cover; border-radius:8px; margin-bottom:8px; }
-  .hidden { display:none; }
-  nav { display:flex; gap:6px; margin-bottom:12px; } nav button { margin:0; }
+:root{--bg:#F2F4F7;--surface:#fff;--ink:#0F1720;--mute:#5E6B7A;--line:#E1E6EC;--primary:#1B2A49;--on:#fff;--gold:#F5B700;--found:#0B7A5A;--foundbg:#DDF3EA;--lost:#C8401F;--lostbg:#FBE4DC;--chip:#E9EDF2;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0D1117;--surface:#161C25;--ink:#EEF1F5;--mute:#93A0AF;--line:#263040;--primary:#9DB8FF;--on:#0D1117;--found:#5FD3A8;--foundbg:#12342A;--lost:#FF9275;--lostbg:#3A1E16;--chip:#212A37;color-scheme:dark}}
+:root{--art:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1200' preserveAspectRatio='xMidYMax slice'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23D6E4F5'/%3E%3Cstop offset='1' stop-color='%23F7ECD4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='1200' fill='url(%23g)'/%3E%3Ccircle cx='620' cy='250' r='90' fill='%23F5B700' fill-opacity='.35'/%3E%3Cg fill='%231B2A49' fill-opacity='.09'%3E%3Crect x='30' y='880' width='150' height='320'/%3E%3Crect x='200' y='800' width='110' height='400'/%3E%3Cpath d='M330 1200V860l90-70 90 70v340z'/%3E%3Crect x='540' y='900' width='120' height='300'/%3E%3Crect x='680' y='830' width='130' height='370'/%3E%3C/g%3E%3Cg fill='%23FFFFFF' fill-opacity='.35'%3E%3Crect x='60' y='920' width='20' height='24'/%3E%3Crect x='100' y='920' width='20' height='24'/%3E%3Crect x='230' y='850' width='20' height='24'/%3E%3Crect x='265' y='850' width='20' height='24'/%3E%3Crect x='700' y='880' width='20' height='24'/%3E%3Crect x='740' y='880' width='20' height='24'/%3E%3C/g%3E%3C/svg%3E")}
+@media(prefers-color-scheme:dark){:root{--art:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1200' preserveAspectRatio='xMidYMax slice'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%230D1117'/%3E%3Cstop offset='1' stop-color='%23203150'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='800' height='1200' fill='url(%23g)'/%3E%3Ccircle cx='620' cy='250' r='90' fill='%23F5B700' fill-opacity='.16'/%3E%3Cg fill='%23FFFFFF' fill-opacity='.06'%3E%3Crect x='30' y='880' width='150' height='320'/%3E%3Crect x='200' y='800' width='110' height='400'/%3E%3Cpath d='M330 1200V860l90-70 90 70v340z'/%3E%3Crect x='540' y='900' width='120' height='300'/%3E%3Crect x='680' y='830' width='130' height='370'/%3E%3C/g%3E%3Cg fill='%23F5B700' fill-opacity='.22'%3E%3Crect x='60' y='920' width='20' height='24'/%3E%3Crect x='100' y='920' width='20' height='24'/%3E%3Crect x='230' y='850' width='20' height='24'/%3E%3Crect x='265' y='850' width='20' height='24'/%3E%3Crect x='700' y='880' width='20' height='24'/%3E%3Crect x='740' y='880' width='20' height='24'/%3E%3C/g%3E%3C/svg%3E")}}
+body::before{content:"";position:fixed;inset:0;background:var(--art) center bottom/cover no-repeat;z-index:-1}
+.pw{position:relative}.pw .field{padding-right:74px}
+.eye{position:absolute;right:6px;top:6px;border:0;background:none;color:var(--primary);font:inherit;font-weight:600;padding:8px 10px;cursor:pointer}
+.btn.danger{background:var(--lostbg);color:var(--lost)}
+.link{border:0;background:none;color:var(--mute);font:inherit;font-size:13px;padding:8px 0 0;cursor:pointer;text-decoration:underline}
+.pill{font-size:12px;font-weight:600;color:var(--mute)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+#shell{max-width:520px;margin:0 auto;min-height:100dvh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:calc(12px + env(safe-area-inset-top)) 16px 12px}
+.brand{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.brand h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.3px}
+.brand small{color:var(--mute);display:block;font-size:12px;font-weight:500}
+.search{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:12px;padding:0 12px}
+.search input{flex:1;border:0;background:none;color:var(--ink);font:inherit;padding:12px 0;outline:none;min-width:0}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:500;padding:7px 14px;border-radius:99px;cursor:pointer}
+.chip.on{background:var(--primary);color:var(--on);border-color:var(--primary)}
+.page{padding:14px 16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:14px}
+.media{aspect-ratio:16/9;background:var(--chip);display:grid;place-items:center;color:var(--mute);position:relative}
+.media img{width:100%;height:100%;object-fit:cover;display:block}
+.badge{position:absolute;left:10px;top:10px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px}
+.badge.FOUND{background:var(--foundbg);color:var(--found)}.badge.LOST{background:var(--lostbg);color:var(--lost)}
+.state{position:absolute;right:10px;top:10px;background:rgba(15,23,32,.78);color:#fff;font-size:12px;font-weight:600;padding:4px 10px;border-radius:99px}
+.body{padding:12px 14px 14px}
+.body h3{margin:0 0 4px;font-size:17px;letter-spacing:-.2px}
+.meta{display:flex;align-items:center;gap:6px;color:var(--mute);font-size:13px;margin-top:3px}
+.idline{font-weight:600;letter-spacing:.5px;color:var(--ink);font-size:14px}
+.btn{display:block;width:100%;border:0;border-radius:12px;padding:13px;font:inherit;font-weight:600;background:var(--primary);color:var(--on);cursor:pointer;margin-top:12px}
+.btn.alt{background:var(--chip);color:var(--ink)}.btn.sm{display:inline-block;width:auto;padding:9px 16px;margin:10px 8px 0 0}
+.btn:disabled{opacity:.55}
+.field{width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:13px;font:inherit;margin-bottom:10px}
+.field:focus{outline:2px solid var(--primary);outline-offset:0}
+label.l{display:block;font-size:13px;font-weight:600;margin:6px 0 6px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--chip);border-radius:12px;padding:4px;margin-bottom:12px}
+.seg button{border:0;background:none;font:inherit;font-weight:600;padding:10px;border-radius:9px;color:var(--mute);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.photo{display:grid;place-items:center;gap:6px;border:1.5px dashed var(--line);border-radius:14px;min-height:130px;color:var(--mute);cursor:pointer;margin-bottom:10px;overflow:hidden;text-align:center}
+.photo img{width:100%;max-height:220px;object-fit:cover}
+.hint{font-size:12px;color:var(--mute);margin:-4px 0 10px}
+.empty{text-align:center;color:var(--mute);padding:40px 24px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.empty b{display:block;color:var(--ink);font-size:17px;margin:10px 0 4px}
+.sk{height:230px;border-radius:16px;margin-bottom:14px;background:linear-gradient(90deg,var(--chip),var(--line),var(--chip));background-size:200% 100%;animation:sh 1.3s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:6}
+nav button{border:0;background:none;color:var(--mute);font:inherit;font-size:11px;font-weight:600;display:grid;justify-items:center;gap:3px;padding:6px 0;cursor:pointer}
+nav button.on{color:var(--primary)}
+nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);color:#1B1B1B;display:grid;place-items:center;margin-top:-22px;box-shadow:0 4px 14px rgba(245,183,0,.45)}
+.veil{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:8;opacity:0;pointer-events:none;transition:opacity .2s}
+.veil.open{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:50%;bottom:0;width:100%;max-width:520px;transform:translate(-50%,100%);background:var(--surface);border-radius:22px 22px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom));z-index:9;transition:transform .25s ease;max-height:88dvh;overflow-y:auto}
+.sheet.open{transform:translate(-50%,0)}
+.sheet h2{margin:0 0 4px;font-size:19px}.sheet p{color:var(--mute);margin:0 0 12px}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:-6px auto 14px}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:#10161f;color:#fff;padding:11px 16px;border-radius:12px;font-weight:500;z-index:12;opacity:0;pointer-events:none;transition:.2s;max-width:88%;text-align:center}
+#toast.show{opacity:1;transform:translate(-50%,0)}#toast.bad{background:#B3261E}
+.hidden{display:none!important}
+.row{display:flex;gap:10px;align-items:center}
+.who{display:flex;gap:12px;align-items:center;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-bottom:14px}
+.av{width:46px;height:46px;border-radius:50%;background:var(--primary);color:var(--on);display:grid;place-items:center;font-weight:700;font-size:18px}
+.tips{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;color:var(--mute);font-size:14px}
+.tips b{color:var(--ink)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<header><h1>Campus Find</h1><button class="sm ghost" id="authBtn"></button></header>
-<main>
-  <nav>
-    <button class="ghost" data-view="feed">Browse</button>
-    <button class="ghost" data-view="post">Report</button>
-    <button class="ghost" data-view="mine">My claims</button>
-  </nav>
-  <p id="msg" class="muted"></p>
+<div id="shell">
+  <div class="top" id="top">
+    <div class="brand"><div><h1>Campus Find</h1><small>Lost something? Found something?</small></div></div>
+    <label class="search"><svg id="ic-search" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search phone, ID, library…" enterkeyhint="search"></label>
+  </div>
+  <div id="filters">
+    <div class="chips" id="typeChips"></div>
+    <div class="chips" id="catChips"></div>
+  </div>
+  <div class="page" id="app"></div>
+</div>
 
-  <section id="feed">
-    <input id="q" placeholder="Search e.g. CSC, phone, library">
-    <div class="row">
-      <select id="ftype"><option value="">All</option><option>FOUND</option><option>LOST</option></select>
-      <select id="fcat"><option value="">Any category</option><option>ID_CARD</option><option>PHONE</option><option>CARD</option><option>BAG</option><option>KEYS</option><option>OTHER</option></select>
-    </div>
-    <div id="list"></div>
-  </section>
-
-  <section id="post" class="hidden">
-    <select id="ptype"><option>FOUND</option><option>LOST</option></select>
-    <select id="pcat"><option>ID_CARD</option><option>PHONE</option><option>CARD</option><option>BAG</option><option>KEYS</option><option>OTHER</option></select>
-    <input id="ptitle" placeholder="Title (e.g. Black Tecno phone)">
-    <textarea id="pdesc" rows="2" placeholder="Description (no sensitive numbers)"></textarea>
-    <input id="pid" placeholder="ID number, if any (will be masked publicly)">
-    <input id="ploc" placeholder="Where it was found/lost">
-    <select id="pzone"><option value="">Handoff spot…</option><option>Main Library Entrance</option><option>Porter's Lodge</option><option>Shuttle Terminal</option><option>Department Office</option></select>
-    <input id="pimg" type="file" accept="image/*">
-    <img id="ppreview" class="thumb hidden" alt="">
-    <div id="secbox">
-      <input id="pq" placeholder="Secret question only the owner can answer">
-      <input id="pa" placeholder="Answer">
-    </div>
-    <button id="submitItem">Post</button>
-  </section>
-
-  <section id="mine" class="hidden"><div id="claims"></div></section>
-
-  <section id="auth" class="hidden">
-    <h3 id="authTitle">Log in</h3>
-    <input id="aname" class="hidden" placeholder="Full name">
-    <input id="aemail" type="email" placeholder="Student email">
-    <input id="aphone" class="hidden" placeholder="Phone">
-    <input id="apass" type="password" placeholder="Password (8+ chars)">
-    <button id="authGo">Continue</button>
-    <button class="ghost" id="authSwap">Need an account? Register</button>
-  </section>
-</main>
+<nav>
+  <button data-tab="browse"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Browse</button>
+  <button data-tab="report" class="fab"><span><svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>Report</button>
+  <button data-tab="claims"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Claims</button>
+  <button data-tab="account"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Account</button>
+</nav>
+<div class="veil" id="veil"></div>
+<div class="sheet" id="sheet"></div>
+<div id="toast"></div>
 
 <script>
-const API = 'https://campusfind-uid7.onrender.com'; // <- your Render URL
-const CLOUD_NAME = 'deadrpp5';               // <- Cloudinary dashboard
-const UPLOAD_PRESET = 'ca4ry12f';       // <- Settings > Upload > unsigned preset
+// ---- SETTINGS: fill these three in ----
+const API = 'https://YOUR-RENDER-APP.onrender.com';
+const CLOUD_NAME = 'YOUR_CLOUD_NAME';
+const UPLOAD_PRESET = 'YOUR_UNSIGNED_PRESET';
+// ---------------------------------------
 
-// Shrink photo on the phone (saves data), then upload straight to Cloudinary.
-async function uploadImage(file) {
-  const bmp = await createImageBitmap(file);
-  const scale = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
-  const fd = new FormData();
-  fd.append('file', blob); fd.append('upload_preset', UPLOAD_PRESET);
-  const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error?.message || 'Image upload failed');
-  return d.secure_url;
-}
-let token = localStorage.getItem('token'), registering = false;
+const CATS = { ID_CARD:'ID card', PHONE:'Phone', CARD:'Bank card', BAG:'Bag', KEYS:'Keys', OTHER:'Other' };
+const ZONES = ['Main Library Entrance', "Porter's Lodge", 'Shuttle Terminal', 'Department Office'];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const boxIcon = '<svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>';
+const pinIcon = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
 
-async function api(path, method='GET', body) {
-  const r = await fetch(API + path, {
-    method, headers: { 'Content-Type':'application/json', ...(token ? { Authorization:'Bearer '+token } : {}) },
+let token = localStorage.getItem('token');
+let user = JSON.parse(localStorage.getItem('user') || 'null');
+let tab = 'browse', items = [], filt = { type:'', category:'', q:'' }, timer;
+let rKind = 'FOUND', rCat = 'ID_CARD';
+
+async function api(path, method = 'GET', body) {
+  const r = await fetch(API + path, { method,
+    headers: { 'Content-Type':'application/json', ...(token ? { Authorization:'Bearer ' + token } : {}) },
     body: body ? JSON.stringify(body) : undefined });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'Request failed');
-  return data;
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { if (r.status === 401) logout(true); throw new Error(d.error || 'Something went wrong. Try again.'); }
+  return d;
 }
-const say = (t, bad) => { $('msg').textContent = t || ''; $('msg').className = bad ? 'err' : 'muted'; };
-
-function show(view) {
-  for (const v of ['feed','post','mine','auth']) $(v).classList.toggle('hidden', v !== view);
-  if ((view === 'post' || view === 'mine') && !token) return show('auth');
-  if (view === 'feed') loadFeed();
-  if (view === 'mine') loadClaims();
+function toast(msg, bad) {
+  const t = $('toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 3200);
 }
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => { say(''); show(b.dataset.view); });
-function renderAuthBtn() { $('authBtn').textContent = token ? 'Log out' : 'Log in'; }
-$('authBtn').onclick = () => { if (token) { token = null; localStorage.removeItem('token'); renderAuthBtn(); show('feed'); } else show('auth'); };
-$('authSwap').onclick = () => {
-  registering = !registering;
-  ['aname','aphone'].forEach(i => $(i).classList.toggle('hidden', !registering));
-  $('authTitle').textContent = registering ? 'Register' : 'Log in';
-  $('authSwap').textContent = registering ? 'Have an account? Log in' : 'Need an account? Register';
-};
-$('authGo').onclick = async () => {
-  try {
-    const d = await api(registering ? '/api/auth/register' : '/api/auth/login', 'POST', {
-      full_name: $('aname').value, student_email: $('aemail').value, phone: $('aphone').value, password: $('apass').value });
-    token = d.token; localStorage.setItem('token', token); renderAuthBtn(); say('Welcome, ' + d.user.full_name); show('feed');
-  } catch (e) { say(e.message, true); }
-};
+function openSheet(html) { $('sheet').innerHTML = '<div class="grab"></div>' + html; $('sheet').classList.add('open'); $('veil').classList.add('open'); }
+function closeSheet() { $('sheet').classList.remove('open'); $('veil').classList.remove('open'); }
+$('veil').onclick = closeSheet;
+function ago(d) {
+  const m = Math.floor((Date.now() - new Date(d)) / 60000);
+  if (m < 1) return 'Just now'; if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60); if (h < 24) return h + ' h ago';
+  const dd = Math.floor(h / 24); return dd + (dd === 1 ? ' day ago' : ' days ago');
+}
+async function uploadImage(file) {
+  const bmp = await createImageBitmap(file);
+  const s = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', .8));
+  const fd = new FormData(); fd.append('file', blob); fd.append('upload_preset', UPLOAD_PRESET);
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method:'POST', body: fd });
+  const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || 'Photo upload failed');
+  return d.secure_url;
+}
 
+// ---------- navigation ----------
+function go(t) {
+  if ((t === 'report' || t === 'claims') && !token) { tab = t; return authSheet('login', 'Log in to ' + (t === 'report' ? 'report an item' : 'see your claims')); }
+  tab = t;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('top').classList.toggle('hidden', t !== 'browse'); $('filters').classList.toggle('hidden', t !== 'browse');
+  ({ browse: viewBrowse, report: viewReport, claims: viewClaims, account: viewAccount })[t]();
+  window.scrollTo(0, 0);
+}
+
+// ---------- browse ----------
+function renderChips() {
+  const types = [['', 'All'], ['FOUND', 'Found'], ['LOST', 'Lost']];
+  $('typeChips').innerHTML = types.map(([v, l]) => `<button class="chip ${filt.type === v ? 'on' : ''}" data-act="type" data-v="${v}">${l}</button>`).join('');
+  $('catChips').innerHTML = [['', 'Any category'], ...Object.entries(CATS)].map(([v, l]) => `<button class="chip ${filt.category === v ? 'on' : ''}" data-act="cat" data-v="${v}">${l}</button>`).join('');
+}
+function viewBrowse() { renderChips(); $('app').innerHTML = '<div id="list"><div class="sk"></div><div class="sk"></div></div>'; loadFeed(); }
 async function loadFeed() {
-  const p = new URLSearchParams({ type:$('ftype').value, category:$('fcat').value, q:$('q').value });
-  [...p.keys()].forEach(k => !p.get(k) && p.delete(k));
-  try {
-    const items = await api('/api/items?' + p);
-    $('list').innerHTML = items.length ? items.map(i => `
-      <div class="card">
-        ${i.image_url ? `<img class="thumb" src="${esc(i.image_url)}" alt="">` : ''}
-        <span class="tag">${esc(i.type)}</span><span class="tag">${esc(i.category)}</span><span class="tag">${esc(i.status)}</span>
-        <h3 style="margin:6px 0">${esc(i.title)}</h3>
-        ${i.masked_identifier ? `<div class="muted">ID: ${esc(i.masked_identifier)}</div>` : ''}
-        <div class="muted">${esc(i.location)}${i.handoff_zone ? ' · Handoff: ' + esc(i.handoff_zone) : ''}</div>
-        ${i.type === 'FOUND' && i.status === 'OPEN' && i.security_question ? `<button class="sm" style="margin-top:8px" onclick="openClaim(${i.id})">This is mine</button>
-          <div id="cb${i.id}" class="hidden" style="margin-top:8px"><div class="muted" style="margin-bottom:6px">${esc(i.security_question)}</div><input id="ca${i.id}" placeholder="Your answer"><button class="sm" onclick="claim(${i.id})">Submit answer</button></div>` : ''}
-        ${i.status === 'VERIFIED' ? `<button class="sm ghost" style="margin-top:8px" onclick="contact(${i.id})">Get finder contact</button>` : ''}
-      </div>`).join('') : '<p class="muted">Nothing here yet.</p>';
-  } catch (e) { say(e.message, true); }
+  const p = new URLSearchParams(Object.entries(filt).filter(([, v]) => v));
+  try { items = await api('/api/items?' + p); renderList(); }
+  catch (e) { $('list').innerHTML = `<div class="empty"><b>Can't load items</b>${esc(e.message)}<button class="btn alt" data-act="retry">Try again</button></div>`; }
 }
-['q','ftype','fcat'].forEach(i => $(i).addEventListener('input', loadFeed));
+function renderList() {
+  if (!items.length) { $('list').innerHTML = `<div class="empty">${boxIcon}<b>Nothing here yet</b>No items match. Be the first to report one.<button class="btn" data-act="goreport">Report an item</button></div>`; return; }
+  $('list').innerHTML = items.map(i => {
+    const st = i.status === 'CLAIM_PENDING' ? 'Claim pending' : i.status === 'VERIFIED' ? 'Verified' : '';
+    let action = '';
+    if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="claim" data-id="${i.id}">This is mine</button>`;
+    else if (i.status === 'VERIFIED') action = `<button class="btn alt" data-act="contact" data-id="${i.id}">Get finder's contact</button>`;
+    return `<article class="card">
+      <div class="media">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : boxIcon}
+        <span class="badge ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span>${st ? `<span class="state">${st}</span>` : ''}</div>
+      <div class="body"><h3>${esc(i.title)}</h3>
+        ${i.masked_identifier ? `<div class="idline">${esc(i.masked_identifier)}</div>` : ''}
+        ${i.description ? `<div class="meta">${esc(i.description)}</div>` : ''}
+        <div class="meta">${pinIcon}${esc(i.location)} · ${ago(i.created_at)}</div>
+        ${i.handoff_zone ? `<div class="meta">Hand-off: ${esc(i.handoff_zone)}</div>` : ''}${action}
+        <div style="text-align:right"><button class="link" data-act="report" data-id="${i.id}">Report this post</button></div></div></article>`;
+  }).join('');
+}
+$('q').addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => { filt.q = e.target.value.trim(); loadFeed(); }, 300); });
 
-window.openClaim = (id) => {
-  if (!token) { say('Log in first to claim an item.', true); return show('auth'); }
-  $('cb' + id).classList.toggle('hidden');
-};
-window.claim = async (id) => {
-  const ans = $('ca' + id).value.trim();
-  if (!ans) return say('Type your answer first.', true);
+// ---------- claim flow ----------
+function claimSheet(id) {
+  const i = items.find(x => x.id == id); if (!i) return;
+  openSheet(`<h2>Prove it's yours</h2><p>The finder set this question. Answer it to claim "${esc(i.title)}".</p>
+    <label class="l">${esc(i.security_question)}</label><input class="field" id="ans" placeholder="Your answer" autocomplete="off">
+    <button class="btn" data-act="submitclaim" data-id="${id}">Submit answer</button>`);
+}
+async function submitClaim(id, btn) {
+  const a = $('ans').value.trim(); if (!a) return toast('Type your answer first', true);
+  btn.disabled = true;
+  try { const d = await api(`/api/items/${id}/claim`, 'POST', { answer: a }); closeSheet(); toast(d.message); loadFeed(); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+async function contactSheet(id) {
   try {
-    const d = await api(`/api/items/${id}/claim`, 'POST', { answer: ans });
-    say(d.message); loadFeed();
-  } catch (e) { say(e.message, true); window.scrollTo(0, 0); }
-};
-window.contact = async (id) => {
-  if (!token) return show('auth');
-  try { const d = await api(`/api/items/${id}/contact`); alert(`${d.finder}\n${d.phone}\nMeet at: ${d.handoff_zone || 'agree a public spot'}`); }
-  catch (e) { say(e.message, true); }
-};
+    const d = await api(`/api/items/${id}/contact`);
+    openSheet(`<h2>Meet ${esc(d.finder)}</h2><p>Hand-off at ${esc(d.handoff_zone || 'a busy public spot on campus')}. Bring your ID.</p>
+      <a class="btn" style="text-decoration:none;text-align:center" href="tel:${esc(d.phone)}">Call ${esc(d.phone)}</a>
+      <a class="btn alt" style="text-decoration:none;text-align:center" href="sms:${esc(d.phone)}">Send a text</a>`);
+  } catch (e) { toast(e.message, true); }
+}
 
-$('ptype').onchange = () => $('secbox').classList.toggle('hidden', $('ptype').value !== 'FOUND');
-$('pimg').onchange = () => {
-  const f = $('pimg').files[0];
-  $('ppreview').classList.toggle('hidden', !f);
-  if (f) $('ppreview').src = URL.createObjectURL(f);
-};
-$('submitItem').onclick = async () => {
-  const btn = $('submitItem'); btn.disabled = true;
+// ---------- report ----------
+function viewReport() {
+  const lost = rKind === 'LOST';
+  $('app').innerHTML = `<h2 style="margin:0 0 12px">Report an item</h2>
+  <div class="seg"><button class="${!lost ? 'on' : ''}" data-act="kind" data-v="FOUND">I found something</button><button class="${lost ? 'on' : ''}" data-act="kind" data-v="LOST">I lost something</button></div>
+  <label class="l">Category</label>
+  <div class="chips" style="padding:0 0 10px">${Object.entries(CATS).map(([v, l]) => `<button class="chip ${rCat === v ? 'on' : ''}" data-act="rcat" data-v="${v}">${l}</button>`).join('')}</div>
+  <label class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo<br><small>Hide any ID numbers if you can</small></span><input id="pimg" type="file" accept="image/*" hidden></label>
+  <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
+  <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
+  <input class="field" id="pid" placeholder="ID number (optional)"><div class="hint">Shown to others with the end hidden, like PS/CSC/22/****</div>
+  <input class="field" id="ploc" placeholder="${lost ? 'Where did you lose it?' : 'Where did you find it?'}">
+  <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select>
+  ${!lost ? `<label class="l">Secret question for the owner</label><input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)">` : ''}
+  <button class="btn" data-act="post" id="postBtn">Post ${lost ? 'lost item' : 'found item'}</button>`;
+  $('pimg').onchange = () => {
+    const f = $('pimg').files[0]; if (!f) return;
+    $('photoBox').innerHTML = `<img src="${URL.createObjectURL(f)}" alt=""><input id="pimg" type="file" accept="image/*" hidden>`;
+    $('pimg').onchange = null; $('photoBox')._file = f;
+  };
+}
+async function postItem(btn) {
+  const file = $('photoBox')._file || $('pimg')?.files?.[0];
+  btn.disabled = true; btn.textContent = file ? 'Uploading photo…' : 'Posting…';
   try {
-    const file = $('pimg').files[0];
-    if (file) say('Uploading photo…');
     const image_url = file ? await uploadImage(file) : null;
-    await api('/api/items', 'POST', {
-      type:$('ptype').value, category:$('pcat').value, title:$('ptitle').value, description:$('pdesc').value,
-      identifier:$('pid').value, location:$('ploc').value, handoff_zone:$('pzone').value, image_url,
-      security_question:$('pq').value, security_answer:$('pa').value });
-    say('Posted.'); ['ptitle','pdesc','pid','ploc','pimg','pq','pa'].forEach(i => $(i).value = '');
-    $('ppreview').classList.add('hidden'); show('feed');
-  } catch (e) { say(e.message, true); }
-  btn.disabled = false;
-};
+    await api('/api/items', 'POST', { type: rKind, category: rCat, title: $('ptitle').value, description: $('pdesc').value,
+      identifier: $('pid').value, location: $('ploc').value, handoff_zone: $('pzone').value, image_url,
+      security_question: $('pq')?.value, security_answer: $('pa')?.value });
+    toast('Posted. Thank you!'); filt = { type:'', category:'', q:'' }; $('q').value = ''; go('browse');
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Post item'; }
+}
 
-async function loadClaims() {
+// ---------- claims (finder) ----------
+async function viewClaims() {
+  $('app').innerHTML = '<h2 style="margin:0 0 12px">Claims on your items</h2><div id="cl"><div class="sk" style="height:110px"></div></div>';
   try {
     const c = await api('/api/my/claims');
-    $('claims').innerHTML = c.length ? c.map(x => `
-      <div class="card"><b>${esc(x.title)}</b><div class="muted">${esc(x.claimant)} answered correctly</div>
-      <div class="row" style="margin-top:8px"><button class="sm" onclick="decide(${x.id},'approve')">Approve</button>
-      <button class="sm ghost" onclick="decide(${x.id},'reject')">Reject</button></div></div>`).join('')
-      : '<p class="muted">No pending claims.</p>';
-  } catch (e) { say(e.message, true); }
+    $('cl').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
+      <div class="meta">${esc(x.claimant)} answered your question correctly · ${ago(x.created_at)}</div>
+      <button class="btn sm" data-act="approve" data-id="${x.id}">Approve</button><button class="btn sm alt" data-act="reject" data-id="${x.id}">Reject</button></div></div>`).join('')
+      : `<div class="empty"><svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg><b>No claims waiting</b>When an owner answers your secret question correctly, it shows up here.</div>`;
+  } catch (e) { $('cl').innerHTML = `<div class="empty"><b>Can't load claims</b>${esc(e.message)}</div>`; }
 }
-window.decide = async (id, act) => { try { await api(`/api/claims/${id}/${act}`, 'PATCH'); loadClaims(); } catch (e) { say(e.message, true); } };
+async function decide(id, act) { try { await api(`/api/claims/${id}/${act}`, 'PATCH'); toast(act === 'approve' ? 'Approved. The owner can now see your contact.' : 'Rejected'); viewClaims(); } catch (e) { toast(e.message, true); } }
 
-renderAuthBtn(); show('feed');
+// ---------- account / auth ----------
+function viewAccount() {
+  $('app').innerHTML = `${user ? `<div class="who"><div class="av">${esc((user.full_name || '?')[0].toUpperCase())}</div><div><b>${esc(user.full_name)}</b><div class="meta" style="margin:0">Signed in</div></div></div>
+    <button class="btn alt" data-act="mine" style="margin:0 0 10px">My posts</button>
+    <button class="btn alt" data-act="chpw" style="margin:0 0 10px">Change password</button>
+    ${user.role === 'admin' ? '<button class="btn alt" data-act="admin" style="margin:0 0 10px">Admin panel</button>' : ''}
+    <button class="btn alt" data-act="logout" style="margin:0 0 10px">Log out</button>
+    <button class="btn danger" data-act="delask" style="margin:0 0 14px">Delete account</button>` : `<div class="empty" style="padding:24px"><b>Sign in to report and claim</b>You can browse without an account.<button class="btn" data-act="login">Log in or register</button></div>`}
+  <div class="tips"><b>Stay safe</b><br>Meet only at the listed hand-off spots, in daylight, and never share a PIN or full card number. Real owners can answer the secret question without help.</div>`;
+}
+let authMode = 'login';
+function authSheet(mode, why) {
+  authMode = mode; const reg = mode === 'register';
+  openSheet(`<h2>${reg ? 'Create your account' : 'Welcome back'}</h2><p>${esc(why || (reg ? 'Use your student email.' : 'Log in to continue.'))}</p>
+    ${reg ? '<input class="field" id="aname" placeholder="Full name"><input class="field" id="aphone" type="tel" placeholder="Phone, e.g. 024 123 4567">' : ''}
+    <input class="field" id="aemail" type="email" placeholder="Student email" autocomplete="email">
+    <div class="pw"><input class="field" id="apass" type="password" placeholder="Password (8+ characters)" autocomplete="${reg ? 'new-password' : 'current-password'}"><button type="button" class="eye" data-act="eye">Show</button></div>
+    <button class="btn" data-act="authgo">${reg ? 'Create account' : 'Log in'}</button>
+    <button class="btn alt" data-act="authswap">${reg ? 'I already have an account' : 'New here? Register'}</button>
+    ${reg ? '' : '<div style="text-align:center"><button class="link" data-act="forgot">Forgot password?</button></div>'}`);
+}
+async function authGo(btn) {
+  btn.disabled = true;
+  try {
+    const reg = authMode === 'register';
+    const d = await api(reg ? '/api/auth/register' : '/api/auth/login', 'POST', { full_name: $('aname')?.value, student_email: $('aemail').value, phone: $('aphone')?.value, password: $('apass').value });
+    token = d.token; user = d.user; localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
+    closeSheet(); toast('Welcome, ' + user.full_name.split(' ')[0]); go(tab === 'account' ? 'account' : tab);
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+function logout(silent) {
+  token = null; user = null; localStorage.removeItem('token'); localStorage.removeItem('user');
+  if (!silent) toast('Logged out'); go(tab === 'claims' || tab === 'report' ? 'browse' : tab);
+}
+
+// ---------- my posts ----------
+const STATUS = { OPEN:'Open', CLAIM_PENDING:'Claim pending', VERIFIED:'Verified', RETURNED:'Returned' };
+const back = '<button class="link" data-tab="account" style="padding:0 0 10px">← Account</button>';
+async function viewMine() {
+  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">My posts</h2><div id="ml"><div class="sk" style="height:110px"></div></div>`;
+  try {
+    const m = await api('/api/my/items');
+    $('ml').innerHTML = m.length ? m.map(x => `<div class="card"><div class="body">
+      <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${CATS[x.category] || ''}</span><span class="pill">${STATUS[x.status]}</span></div>
+      <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</div>
+      ${x.pending_claims ? `<div class="meta" style="color:var(--found);font-weight:600">${x.pending_claims} claim waiting</div><button class="btn sm" data-tab="claims">Review claims</button>` : ''}
+      ${x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">Mark returned</button>` : ''}</div></div>`).join('')
+      : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
+  } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
+}
+async function markReturned(id) { try { await api(`/api/items/${id}/resolve`, 'PATCH'); toast('Marked as returned'); viewMine(); } catch (e) { toast(e.message, true); } }
+
+// ---------- report a post ----------
+function reportSheet(id) {
+  if (!token) return authSheet('login', 'Log in to report a post');
+  openSheet(`<h2>Report this post</h2><p>Three reports hide a post until it's reviewed.</p>
+    ${['Spam or fake post', 'Shows sensitive details', 'Not a real lost item', 'Something else'].map(r => `<button class="btn alt" style="margin-top:8px" data-act="rgo" data-id="${id}" data-v="${r}">${r}</button>`).join('')}`);
+}
+async function sendReport(id, reason) { try { const d = await api(`/api/items/${id}/report`, 'POST', { reason }); closeSheet(); toast(d.message); } catch (e) { toast(e.message, true); } }
+
+// ---------- passwords ----------
+const pwField = (id, ph, ac) => `<div class="pw"><input class="field" id="${id}" type="password" placeholder="${ph}" autocomplete="${ac}"><button type="button" class="eye" data-act="eye">Show</button></div>`;
+let fEmail = '';
+function forgotSheet() {
+  openSheet(`<h2>Reset password</h2><p>We'll text a 6-digit code to the phone on your account.</p>
+    <input class="field" id="fmail" type="email" placeholder="Student email"><button class="btn" data-act="fsend">Send code</button>`);
+}
+async function forgotSend(btn) {
+  fEmail = $('fmail').value.trim(); if (!fEmail) return toast('Enter your email', true);
+  btn.disabled = true;
+  try {
+    const d = await api('/api/auth/forgot', 'POST', { student_email: fEmail }); toast(d.message);
+    openSheet(`<h2>Enter the code</h2><p>Check your SMS. The code lasts 10 minutes.</p>
+      <input class="field" id="fcode" inputmode="numeric" maxlength="6" placeholder="6-digit code">${pwField('fpw', 'New password (8+ characters)', 'new-password')}
+      <button class="btn" data-act="freset">Set new password</button>`);
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+async function forgotReset(btn) {
+  btn.disabled = true;
+  try { const d = await api('/api/auth/reset', 'POST', { student_email: fEmail, code: $('fcode').value, new_password: $('fpw').value }); authSheet('login', d.message); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+function chpwSheet() {
+  openSheet(`<h2>Change password</h2><p>Enter your current password first.</p>${pwField('cpw', 'Current password', 'current-password')}${pwField('npw', 'New password (8+ characters)', 'new-password')}
+    <button class="btn" data-act="chpwgo">Save new password</button>`);
+}
+async function chpwGo(btn) {
+  btn.disabled = true;
+  try { const d = await api('/api/account/password', 'POST', { current_password: $('cpw').value, new_password: $('npw').value }); closeSheet(); toast(d.message); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+
+// ---------- admin ----------
+async function viewAdmin() {
+  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">Admin panel</h2><div id="al"><div class="sk" style="height:110px"></div></div>`;
+  try {
+    const a = await api('/api/admin/items');
+    $('al').innerHTML = a.length ? a.map(x => `<div class="card"><div class="body">
+      <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${STATUS[x.status]}</span><span class="pill" style="${x.reports ? 'color:var(--lost)' : ''}">${x.reports} report${x.reports === 1 ? '' : 's'}</span></div>
+      <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">By ${esc(x.poster)} · ${ago(x.created_at)}${x.hidden ? ' · Hidden' : ''}</div>
+      <button class="btn sm alt" data-act="${x.hidden ? 'unhide' : 'hide'}" data-id="${x.id}">${x.hidden ? 'Show again' : 'Hide'}</button>
+      <button class="btn sm danger" data-act="adel" data-id="${x.id}">Delete</button></div></div>`).join('')
+      : '<div class="empty"><b>No items</b></div>';
+  } catch (e) { $('al').innerHTML = `<div class="empty"><b>Can't open admin panel</b>${esc(e.message)}</div>`; }
+}
+async function adminAct(act, id) {
+  try {
+    if (act === 'adel') { if (!confirm('Delete this item permanently?')) return; await api(`/api/admin/items/${id}`, 'DELETE'); }
+    else await api(`/api/admin/items/${id}/hide`, 'PATCH', { hidden: act === 'hide' });
+    viewAdmin();
+  } catch (e) { toast(e.message, true); }
+}
+
+function delSheet() {
+  openSheet(`<h2>Delete your account?</h2><p>This permanently removes your account, the items you posted and your claims. You can register again later with the same email.</p>
+    <div class="pw"><input class="field" id="dpass" type="password" placeholder="Enter your password to confirm" autocomplete="current-password"><button type="button" class="eye" data-act="eye">Show</button></div>
+    <button class="btn danger" data-act="delgo">Delete my account</button>
+    <button class="btn alt" data-act="closesheet">Cancel</button>`);
+}
+async function delGo(btn) {
+  const password = $('dpass').value; if (!password) return toast('Enter your password to confirm', true);
+  btn.disabled = true;
+  try { await api('/api/account', 'DELETE', { password }); closeSheet(); logout(true); toast('Account deleted'); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+
+// ---------- one click handler ----------
+document.addEventListener('click', e => {
+  const n = e.target.closest('[data-tab]'); if (n) return go(n.dataset.tab);
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const { act, id, v } = t.dataset;
+  if (act === 'type') { filt.type = v; renderChips(); loadFeed(); }
+  else if (act === 'cat') { filt.category = v; renderChips(); loadFeed(); }
+  else if (act === 'retry') loadFeed();
+  else if (act === 'goreport') go('report');
+  else if (act === 'claim') { if (!token) authSheet('login', 'Log in to claim this item'); else claimSheet(id); }
+  else if (act === 'submitclaim') submitClaim(id, t);
+  else if (act === 'contact') contactSheet(id);
+  else if (act === 'kind') {
+    const keep = ['ptitle','pdesc','pid','ploc','pzone'].map(k => $(k)?.value || '');
+    const file = $('photoBox')._file; rKind = v; viewReport();
+    ['ptitle','pdesc','pid','ploc','pzone'].forEach((k, n) => { $(k).value = keep[n]; });
+    if (file) { $('photoBox').innerHTML = `<img src="${URL.createObjectURL(file)}" alt="">`; $('photoBox')._file = file; }
+  }
+  else if (act === 'rcat') { rCat = v; t.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); }
+  else if (act === 'post') postItem(t);
+  else if (act === 'approve' || act === 'reject') decide(id, act);
+  else if (act === 'login') authSheet('login');
+  else if (act === 'authgo') authGo(t);
+  else if (act === 'authswap') authSheet(authMode === 'login' ? 'register' : 'login');
+  else if (act === 'logout') logout();
+  else if (act === 'eye') { const i = t.parentElement.querySelector('input'); const hid = i.type === 'password'; i.type = hid ? 'text' : 'password'; t.textContent = hid ? 'Hide' : 'Show'; }
+  else if (act === 'delask') delSheet();
+  else if (act === 'delgo') delGo(t);
+  else if (act === 'closesheet') closeSheet();
+  else if (act === 'mine') viewMine();
+  else if (act === 'markret') markReturned(id);
+  else if (act === 'report') reportSheet(id);
+  else if (act === 'rgo') sendReport(id, v);
+  else if (act === 'forgot') forgotSheet();
+  else if (act === 'fsend') forgotSend(t);
+  else if (act === 'freset') forgotReset(t);
+  else if (act === 'chpw') chpwSheet();
+  else if (act === 'chpwgo') chpwGo(t);
+  else if (act === 'admin') viewAdmin();
+  else if (act === 'hide' || act === 'unhide' || act === 'adel') adminAct(act, id);
+});
+
+go('browse');
 </script>
 </body>
 </html>
