@@ -116,7 +116,7 @@ nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);co
 
 <script>
 // ---- SETTINGS: fill these three in ----
-const API = 'https://campusfind-uid7.onrender.com';
+const API = 'https://find-hjqq.onrender.com/';
 const CLOUD_NAME = 'deadrpp5';
 const UPLOAD_PRESET = 'ca4ry12f';
 // ---------------------------------------
@@ -143,7 +143,7 @@ async function api(path, method = 'GET', body) {
 }
 function toast(msg, bad) {
   const t = $('toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
-  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', 3200);
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = '', bad ? 6500 : 3200);
 }
 function openSheet(html) { $('sheet').innerHTML = '<div class="grab"></div>' + html; $('sheet').classList.add('open'); $('veil').classList.add('open'); }
 function closeSheet() { $('sheet').classList.remove('open'); $('veil').classList.remove('open'); }
@@ -237,7 +237,9 @@ function viewReport() {
   <div class="seg"><button class="${!lost ? 'on' : ''}" data-act="kind" data-v="FOUND">I found something</button><button class="${lost ? 'on' : ''}" data-act="kind" data-v="LOST">I lost something</button></div>
   <label class="l">Category</label>
   <div class="chips" style="padding:0 0 10px">${Object.entries(CATS).map(([v, l]) => `<button class="chip ${rCat === v ? 'on' : ''}" data-act="rcat" data-v="${v}">${l}</button>`).join('')}</div>
-  <label class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo ${lost ? '(optional)' : '(required)'}<br><small>Hide any ID numbers if you can</small></span><input id="pimg" type="file" accept="image/*" hidden></label>
+  <div class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo ${lost ? '(optional)' : '(required)'}<br><small>Show the item clearly. Cover any ID numbers.</small></span></div>
+  <div class="row" style="margin-bottom:10px"><button class="btn alt" data-act="cam" style="margin:0">Take photo</button><button class="btn alt" data-act="gal" style="margin:0">From gallery</button></div>
+  <input id="pcam" type="file" accept="image/*" capture="environment" hidden><input id="pgal" type="file" accept="image/*" hidden>
   <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
   <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
   <input class="field" id="pid" placeholder="ID number (optional)"><div class="hint">Shown to others with the end hidden, like PS/CSC/22/****</div>
@@ -245,22 +247,22 @@ function viewReport() {
   <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select>
   ${!lost ? `<label class="l">Secret question for the owner</label><input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)">` : ''}
   <button class="btn" data-act="post" id="postBtn">Post ${lost ? 'lost item' : 'found item'}</button>`;
-  $('pimg').onchange = () => {
-    const f = $('pimg').files[0]; if (!f) return;
-    $('photoBox').innerHTML = `<img src="${URL.createObjectURL(f)}" alt=""><input id="pimg" type="file" accept="image/*" hidden>`;
-    $('pimg').onchange = null; $('photoBox')._file = f;
-  };
+  ['pcam', 'pgal'].forEach(id => { $(id).onchange = () => { const f = $(id).files[0]; if (f) { photoFile = f; showPhoto(); } $(id).value = ''; }; });
+  if (photoFile) showPhoto();
 }
+let photoFile = null;
+function showPhoto() { $('photoBox').innerHTML = `<img src="${URL.createObjectURL(photoFile)}" alt="">`; }
 async function postItem(btn) {
-  const file = $('photoBox')._file || $('pimg')?.files?.[0];
+  const file = photoFile;
   if (!file && rKind === 'FOUND') return toast('Add a photo of the item you found', true);
   btn.disabled = true; btn.textContent = file ? 'Uploading photo…' : 'Posting…';
   try {
     const image_url = file ? await uploadImage(file) : null;
+    btn.textContent = 'Checking item…';
     await api('/api/items', 'POST', { type: rKind, category: rCat, title: $('ptitle').value, description: $('pdesc').value,
       identifier: $('pid').value, location: $('ploc').value, handoff_zone: $('pzone').value, image_url,
       security_question: $('pq')?.value, security_answer: $('pa')?.value });
-    toast('Posted. Thank you!'); filt = { type:'', category:'', q:'' }; $('q').value = ''; go('browse');
+    photoFile = null; toast('Posted. Thank you!'); filt = { type:'', category:'', q:'' }; $('q').value = ''; go('browse');
   } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Post item'; }
 }
 
@@ -445,11 +447,18 @@ async function viewMine() {
       : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
   } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
 }
-function pickPhoto(id) {
+function photoSheet(id) {
+  openSheet(`<h2>Add a photo</h2><p>Show the item clearly. We check that it matches your post.</p>
+    <button class="btn" data-act="mpcam" data-id="${id}">Take photo</button>
+    <button class="btn alt" data-act="mpgal" data-id="${id}">Choose from gallery</button>`);
+}
+function pickPhoto(id, camera) {
+  closeSheet();
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  if (camera) inp.capture = 'environment';
   inp.onchange = async () => {
     const f = inp.files[0]; if (!f) return;
-    toast('Uploading photo…');
+    toast('Uploading and checking photo…');
     try { const url = await uploadImage(f); await api(`/api/items/${id}/photo`, 'PATCH', { image_url: url }); toast('Photo saved'); viewMine(); }
     catch (e) { toast(e.message, true); }
   };
@@ -545,9 +554,8 @@ document.addEventListener('click', e => {
   else if (act === 'contact') contactSheet(id);
   else if (act === 'kind') {
     const keep = ['ptitle','pdesc','pid','ploc','pzone'].map(k => $(k)?.value || '');
-    const file = $('photoBox')._file; rKind = v; viewReport();
+    rKind = v; viewReport();
     ['ptitle','pdesc','pid','ploc','pzone'].forEach((k, n) => { $(k).value = keep[n]; });
-    if (file) { $('photoBox').innerHTML = `<img src="${URL.createObjectURL(file)}" alt="">`; $('photoBox')._file = file; }
   }
   else if (act === 'rcat') { rCat = v; t.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); }
   else if (act === 'post') postItem(t);
@@ -565,7 +573,11 @@ document.addEventListener('click', e => {
   else if (act === 'regverify') regVerify(t);
   else if (act === 'regresend') regResend(t);
   else if (act === 'regback') authSheet('register');
-  else if (act === 'addphoto') pickPhoto(id);
+  else if (act === 'addphoto') photoSheet(id);
+  else if (act === 'mpcam') pickPhoto(id, true);
+  else if (act === 'mpgal') pickPhoto(id, false);
+  else if (act === 'cam') $('pcam').click();
+  else if (act === 'gal') $('pgal').click();
   else if (act === 'gotit') gotItSheet(id);
   else if (act === 'gotitgo') gotItGo(id, t);
   else if (act === 'privacy') viewPrivacy();
