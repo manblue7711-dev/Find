@@ -143,19 +143,25 @@ async function loadFeed() {
         <h3 style="margin:6px 0">${esc(i.title)}</h3>
         ${i.masked_identifier ? `<div class="muted">ID: ${esc(i.masked_identifier)}</div>` : ''}
         <div class="muted">${esc(i.location)}${i.handoff_zone ? ' · Handoff: ' + esc(i.handoff_zone) : ''}</div>
-        ${i.type === 'FOUND' && i.status === 'OPEN' && i.security_question ? `<button class="sm" style="margin-top:8px" onclick="claim(${i.id}, '${esc(i.security_question).replace(/'/g, '&#39;')}')">This is mine</button>` : ''}
+        ${i.type === 'FOUND' && i.status === 'OPEN' && i.security_question ? `<button class="sm" style="margin-top:8px" onclick="openClaim(${i.id})">This is mine</button>
+          <div id="cb${i.id}" class="hidden" style="margin-top:8px"><div class="muted" style="margin-bottom:6px">${esc(i.security_question)}</div><input id="ca${i.id}" placeholder="Your answer"><button class="sm" onclick="claim(${i.id})">Submit answer</button></div>` : ''}
         ${i.status === 'VERIFIED' ? `<button class="sm ghost" style="margin-top:8px" onclick="contact(${i.id})">Get finder contact</button>` : ''}
       </div>`).join('') : '<p class="muted">Nothing here yet.</p>';
   } catch (e) { say(e.message, true); }
 }
 ['q','ftype','fcat'].forEach(i => $(i).addEventListener('input', loadFeed));
 
-window.claim = async (id, question) => {
-  if (!token) return show('auth');
-  const ans = prompt(question);
-  if (!ans) return;
-  try { const d = await api(`/api/items/${id}/claim`, 'POST', { answer: ans }); say(d.message); loadFeed(); }
-  catch (e) { say(e.message, true); }
+window.openClaim = (id) => {
+  if (!token) { say('Log in first to claim an item.', true); return show('auth'); }
+  $('cb' + id).classList.toggle('hidden');
+};
+window.claim = async (id) => {
+  const ans = $('ca' + id).value.trim();
+  if (!ans) return say('Type your answer first.', true);
+  try {
+    const d = await api(`/api/items/${id}/claim`, 'POST', { answer: ans });
+    say(d.message); loadFeed();
+  } catch (e) { say(e.message, true); window.scrollTo(0, 0); }
 };
 window.contact = async (id) => {
   if (!token) return show('auth');
