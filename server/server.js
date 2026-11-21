@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
 const app = express();
+app.set('trust proxy', 1); // Render sits behind a proxy; lets rate limits see each user's real IP
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
