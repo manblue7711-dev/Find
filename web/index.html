@@ -44,7 +44,7 @@ body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);c
 .chip.on{background:var(--primary);color:var(--on);border-color:var(--primary)}
 .page{padding:14px 16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 2px rgba(46,45,136,.06)}
-.media{aspect-ratio:16/9;background:var(--chip);display:grid;place-items:center;color:var(--mute);position:relative}
+.media{aspect-ratio:2.4/1;max-height:150px;background:var(--chip);display:grid;place-items:center;color:var(--mute);position:relative}
 .media img{width:100%;height:100%;object-fit:cover;display:block}
 .badge{position:absolute;left:10px;top:10px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px}
 .badge.FOUND{background:var(--foundbg);color:var(--found)}.badge.LOST{background:var(--lostbg);color:var(--lost)}
@@ -195,8 +195,9 @@ function renderList() {
     let action = '';
     if (i.mine) action = '<div class="meta" style="margin-top:10px"><b>Your post</b></div>';
     else if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="claim" data-id="${i.id}">This is mine</button>`;
+    else if (i.type === 'LOST' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="foundit" data-id="${i.id}">I found this</button>`;
     return `<article class="card">
-      <div class="media">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : boxIcon}
+      <div class="media">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy" data-act="zoom" data-src="${esc(i.image_url)}" style="cursor:zoom-in">` : boxIcon}
         <span class="badge ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span>${st ? `<span class="state">${st}</span>` : ''}</div>
       <div class="body"><h3>${esc(i.title)}</h3>
         ${i.masked_identifier ? `<div class="idline">${esc(i.masked_identifier)}</div>` : ''}
@@ -242,10 +243,12 @@ function viewReport() {
   <input id="pcam" type="file" accept="image/*" capture="environment" hidden><input id="pgal" type="file" accept="image/*" hidden>
   <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
   <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
-  <input class="field" id="pid" placeholder="ID number (optional)"><div class="hint">Shown to others with the end hidden, like PS/CSC/22/****</div>
+  <input class="field" id="pid" placeholder="${lost ? 'Full ID number (required for ID cards)' : 'ID number (optional)'}"><div class="hint">${lost ? 'Kept private. Finders must type it to prove they hold your card.' : 'Shown to others with the end hidden, like PS/CSC/22/****'}</div>
   <input class="field" id="ploc" placeholder="${lost ? 'Where did you lose it?' : 'Where did you find it?'}">
   <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select>
-  ${!lost ? `<label class="l">Secret question for the owner</label><input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)">` : ''}
+  ${lost
+    ? `<label class="l">Secret detail only you know (required)</label><input class="field" id="pq" placeholder="e.g. What sticker is on the back?"><input class="field" id="pa" placeholder="The answer (a finder must get it right)"><div class="hint">A finder has to answer this and send a live proof photo before you see their contact.</div>`
+    : `<label class="l">Secret question for the owner (required)</label><input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)">`}
   <button class="btn" data-act="post" id="postBtn">Post ${lost ? 'lost item' : 'found item'}</button>`;
   ['pcam', 'pgal'].forEach(id => { $(id).onchange = () => { const f = $(id).files[0]; if (f) { photoFile = f; showPhoto(); } $(id).value = ''; }; });
   if (photoFile) showPhoto();
@@ -272,16 +275,53 @@ async function viewClaims() {
     <h2 style="margin:22px 0 12px">Items you claimed</h2><div id="cd"><div class="sk" style="height:110px"></div></div>`;
   api('/api/my/claims').then(c => {
     $('cl').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
-      <div class="meta">${esc(x.claimant)} answered your question correctly · ${ago(x.created_at)}</div>
+      ${x.proof_url ? `<img src="${esc(x.proof_url)}" alt="" data-act="zoom" data-src="${esc(x.proof_url)}" style="width:100%;max-height:170px;object-fit:cover;border-radius:10px;margin:6px 0;cursor:zoom-in">` : ''}
+      <div class="meta">${x.item_type === 'LOST'
+        ? esc(x.claimant) + ' says they found your item. They answered your secret question correctly' + (x.id_matched ? ' and typed the right ID number' : '') + '. Check their proof photo (it must show the item and their code). '
+        : esc(x.claimant) + ' answered your question correctly. '}${ago(x.created_at)}</div>
       <button class="btn sm" data-act="approve" data-id="${x.id}">Approve</button><button class="btn sm alt" data-act="reject" data-id="${x.id}">Reject</button></div></div>`).join('')
       : `<div class="empty"><b>No claims waiting</b>When an owner answers your secret question correctly, it shows up here.</div>`;
   }).catch(e => { $('cl').innerHTML = `<div class="empty"><b>Can't load claims</b>${esc(e.message)}</div>`; });
   api('/api/my/claimed').then(c => {
     $('cd').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
-      <div class="meta">${x.claim_status === 'APPROVED' ? 'Approved. Meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the finder to approve.'}</div>
-      ${x.claim_status === 'APPROVED' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button><button class="btn sm alt" data-act="gotit" data-id="${x.id}">I received it</button>` : ''}</div></div>`).join('')
+      <div class="meta">${x.type === 'LOST'
+        ? (x.claim_status === 'APPROVED' ? 'The owner approved your report. They will contact you to meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the owner to review your proof.')
+        : (x.claim_status === 'APPROVED' ? 'Approved. Meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the finder to approve.')}</div>
+      ${x.claim_status === 'APPROVED' && x.type !== 'LOST' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button><button class="btn sm alt" data-act="gotit" data-id="${x.id}">I received it</button>` : ''}</div></div>`).join('')
       : `<div class="empty"><b>Nothing claimed yet</b>Found something that's yours? Tap "This is mine" in Browse.</div>`;
   }).catch(e => { $('cd').innerHTML = `<div class="empty"><b>Can't load your claims</b>${esc(e.message)}</div>`; });
+}
+let proof = { id: null, code: '', file: null };
+async function foundItSheet(id) {
+  const i = items.find(x => x.id == id); if (!i) return;
+  try {
+    const d = await api(`/api/items/${id}/proof-code`);
+    proof = { id, code: d.code, file: null };
+    openSheet(`<h2>Prove you have it</h2><p>Answer the owner's question, then photograph the item next to a paper with this code.</p>
+      <div style="font-size:34px;font-weight:700;letter-spacing:8px;text-align:center;color:var(--primary);margin:4px 0 12px">${esc(d.code)}</div>
+      <label class="l">${esc(i.security_question)}</label><input class="field" id="fa" placeholder="Your answer" autocomplete="off">
+      ${i.category === 'ID_CARD' ? '<label class="l">Full ID number on the card</label><input class="field" id="fid" placeholder="Exactly as printed" autocomplete="off">' : ''}
+      <div class="photo" id="proofBox" style="min-height:90px"><span>Write the code on paper, put it next to the item, then take the photo.</span></div>
+      <input id="pcam2" type="file" accept="image/*" capture="environment" hidden>
+      <button class="btn alt" data-act="proofcam" style="margin-top:0">Take proof photo</button>
+      <button class="btn" data-act="proofgo">Send to owner</button>`);
+    $('pcam2').onchange = () => {
+      const f = $('pcam2').files[0]; if (!f) return;
+      proof.file = f; $('proofBox').innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`;
+    };
+  } catch (e) { toast(e.message, true); }
+}
+async function foundItGo(btn) {
+  const answer = $('fa').value.trim(); if (!answer) return toast('Answer the owner\'s question', true);
+  if ($('fid') && !$('fid').value.trim()) return toast('Enter the ID number from the card', true);
+  if (!proof.file) return toast('Take the proof photo first', true);
+  btn.disabled = true; btn.textContent = 'Uploading photo…';
+  try {
+    const proof_url = await uploadImage(proof.file);
+    btn.textContent = 'Checking proof…';
+    const d = await api(`/api/items/${proof.id}/found-it`, 'POST', { answer, proof_url, identifier: $('fid')?.value, code: proof.code });
+    closeSheet(); toast(d.message); loadFeed();
+  } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Send to owner'; }
 }
 function gotItSheet(id) {
   openSheet(`<h2>Did you get it back?</h2><p>Only confirm after the item is in your hands. This closes the post and can't be undone.</p>
@@ -443,7 +483,8 @@ async function viewMine() {
       <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</div>
       ${x.pending_claims ? `<div class="meta" style="color:var(--found);font-weight:600">${x.pending_claims} claim waiting</div><button class="btn sm" data-tab="claims">Review claims</button>` : ''}
       ${x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="addphoto" data-id="${x.id}">${x.image_url ? 'Change photo' : 'Add photo'}</button>` : ''}
-      ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">I found it</button>` : ''}
+      ${x.type === 'LOST' && x.status === 'VERIFIED' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button>` : ''}
+      ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">${x.status === 'VERIFIED' ? 'I got it back' : 'I found it myself'}</button>` : ''}
       ${x.type === 'FOUND' && x.status === 'VERIFIED' ? '<div class="meta">Waiting for the owner to confirm they received it.</div>' : ''}</div></div>`).join('')
       : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
   } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
@@ -579,6 +620,10 @@ document.addEventListener('click', e => {
   else if (act === 'mpgal') pickPhoto(id, false);
   else if (act === 'cam') $('pcam').click();
   else if (act === 'gal') $('pgal').click();
+  else if (act === 'zoom') openSheet(`<img src="${esc(t.dataset.src)}" alt="" style="width:100%;border-radius:12px;display:block"><button class="btn alt" data-act="closesheet">Close</button>`);
+  else if (act === 'foundit') { if (!token) authSheet('login', 'Log in first'); else foundItSheet(id); }
+  else if (act === 'proofcam') $('pcam2').click();
+  else if (act === 'proofgo') foundItGo(t);
   else if (act === 'gotit') gotItSheet(id);
   else if (act === 'gotitgo') gotItGo(id, t);
   else if (act === 'privacy') viewPrivacy();
