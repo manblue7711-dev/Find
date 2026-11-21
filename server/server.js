@@ -208,6 +208,7 @@ app.post('/api/items', auth, wrap(async (req, res) => {
   if (!type || !category || !title || !location)
     return res.status(400).json({ error: 'type, category, title, location required' });
   const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  if (type === 'FOUND' && !image_url) return res.status(400).json({ error: 'Add a photo of the item you found' });
   if (image_url && !String(image_url).startsWith(`https://res.cloudinary.com/${cloud}/`))
     return res.status(400).json({ error: 'Invalid image URL' });
   if (type === 'FOUND' && (!security_question || !security_answer))
@@ -342,6 +343,19 @@ app.get('/api/my/items', auth, wrap(async (req, res) => {
        (SELECT count(*) FROM claims c WHERE c.item_id=items.id AND c.status='PENDING' AND c.answer_matched)::int AS pending_claims
      FROM items WHERE posted_by=$1 ORDER BY created_at DESC`, [req.user.id]);
   res.json(r.rows);
+}));
+
+// Add or replace the photo after posting (owner of the post, or an admin).
+app.patch('/api/items/:id/photo', auth, wrap(async (req, res) => {
+  const url = String(req.body.image_url || '');
+  if (!url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/`))
+    return res.status(400).json({ error: 'Invalid image URL' });
+  const role = (await pool.query('SELECT role FROM users WHERE id=$1', [req.user.id])).rows[0]?.role;
+  const r = await pool.query(
+    "UPDATE items SET image_url=$1 WHERE id=$2 AND status <> 'RETURNED' AND (posted_by=$3 OR $4::boolean) RETURNING id",
+    [url, req.params.id, req.user.id, role === 'admin']);
+  if (!r.rows[0]) return res.status(404).json({ error: 'Item not found' });
+  res.json({ message: 'Photo saved' });
 }));
 
 // Items I have claimed (so I can get the contact and confirm receipt).
