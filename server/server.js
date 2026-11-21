@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 
@@ -127,7 +128,7 @@ app.post('/api/auth/login', strict, wrap(async (req, res) => {
 // Public feed: never exposes phone, raw identifier, or the answer.
 app.get('/api/items', wrap(async (req, res) => {
   const { type, category, q } = req.query;
-  const where = ["i.status <> 'RETURNED'"];
+  const where = ["i.status <> 'RETURNED'", 'i.hidden = false', "i.created_at > now() - interval '60 days'"];
   const vals = [];
   if (type) { vals.push(type); where.push(`i.type=$${vals.length}`); }
   if (category) { vals.push(category); where.push(`i.category=$${vals.length}`); }
@@ -194,6 +195,10 @@ app.post('/api/items/:id/claim', auth, strict, wrap(async (req, res) => {
     [item.id, req.user.id, matched, matched ? 'PENDING' : 'REJECTED']);
   if (!matched) return res.status(403).json({ error: 'Answer did not match' });
   await pool.query("UPDATE items SET status='CLAIM_PENDING' WHERE id=$1", [item.id]);
+  pool.query('SELECT u.phone, i.title FROM items i JOIN users u ON u.id=i.posted_by WHERE i.id=$1', [item.id])
+    .then((q) => q.rows[0] && sendSms([q.rows[0].phone],
+      `Campus Find: someone answered your question for "${q.rows[0].title}". Open the app > Claims to approve.`))
+    .catch((e) => console.error('claim sms failed', e));
   res.json({ message: 'Answer matched. Waiting for the finder to approve.' });
 }));
 
@@ -214,6 +219,11 @@ app.patch('/api/claims/:id/approve', auth, wrap(async (req, res) => {
   if (!r.rows[0]) return res.status(404).json({ error: 'Claim not found' });
   await pool.query("UPDATE items SET status='VERIFIED' WHERE id=$1", [r.rows[0].item_id]);
   res.json({ message: 'Approved' });
+  pool.query(`SELECT u.phone, i.title FROM claims c JOIN users u ON u.id=c.claimant_id
+              JOIN items i ON i.id=c.item_id WHERE c.id=$1`, [req.params.id])
+    .then((q) => q.rows[0] && sendSms([q.rows[0].phone],
+      `Campus Find: your claim for "${q.rows[0].title}" was approved. Open the app to get the finder's contact.`))
+    .catch((e) => console.error('approve sms failed', e));
 }));
 
 app.patch('/api/claims/:id/reject', auth, wrap(async (req, res) => {
@@ -247,6 +257,120 @@ app.patch('/api/items/:id/resolve', auth, wrap(async (req, res) => {
     [req.params.id, req.user.id, req.user.role]);
   if (!r.rows[0]) return res.status(404).json({ error: 'Item not found' });
   res.json({ message: 'Marked as returned' });
+}));
+
+// ---------- my posts ----------
+app.get('/api/my/items', auth, wrap(async (req, res) => {
+  const r = await pool.query(
+    `SELECT id, type, category, title, image_url, status, hidden, created_at,
+       (SELECT count(*) FROM claims c WHERE c.item_id=items.id AND c.status='PENDING' AND c.answer_matched)::int AS pending_claims
+     FROM items WHERE posted_by=$1 ORDER BY created_at DESC`, [req.user.id]);
+  res.json(r.rows);
+}));
+
+// ---------- reports (3 different reporters auto-hide an item) ----------
+app.post('/api/items/:id/report', auth, strict, wrap(async (req, res) => {
+  const it = (await pool.query('SELECT posted_by FROM items WHERE id=$1', [req.params.id])).rows[0];
+  if (!it) return res.status(404).json({ error: 'Item not found' });
+  if (it.posted_by === req.user.id) return res.status(400).json({ error: 'You posted this item' });
+  const reason = String(req.body.reason || 'Other').slice(0, 200);
+  await pool.query(
+    'INSERT INTO reports (item_id, reporter_id, reason) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING',
+    [req.params.id, req.user.id, reason]);
+  const n = (await pool.query('SELECT count(*)::int AS n FROM reports WHERE item_id=$1', [req.params.id])).rows[0].n;
+  if (n >= 3) await pool.query('UPDATE items SET hidden=true WHERE id=$1', [req.params.id]);
+  res.json({ message: 'Thanks. We will review this item.' });
+}));
+
+// ---------- passwords ----------
+const validPw = (p) => typeof p === 'string' && p.length >= 8;
+
+app.post('/api/auth/forgot', strict, wrap(async (req, res) => {
+  const u = (await pool.query('SELECT id, phone FROM users WHERE student_email=$1',
+    [norm(req.body.student_email)])).rows[0];
+  if (u) {
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+    await pool.query('DELETE FROM password_resets WHERE user_id=$1', [u.id]);
+    await pool.query(
+      `INSERT INTO password_resets (user_id, code_hash, expires_at) VALUES ($1,$2, now() + interval '10 minutes')`,
+      [u.id, await bcrypt.hash(code, 10)]);
+    await sendSms([u.phone], `Campus Find: your password reset code is ${code}. It expires in 10 minutes.`);
+  }
+  res.json({ message: 'If that email is registered, a code was sent by SMS.' }); // same reply either way
+}));
+
+app.post('/api/auth/reset', strict, wrap(async (req, res) => {
+  const { student_email, code, new_password } = req.body;
+  if (!validPw(new_password)) return res.status(400).json({ error: 'Password must be 8+ characters' });
+  const row = (await pool.query(
+    `SELECT r.id, r.user_id, r.code_hash, r.attempts FROM password_resets r
+     JOIN users u ON u.id=r.user_id WHERE u.student_email=$1 AND r.expires_at > now()`,
+    [norm(student_email)])).rows[0];
+  if (!row || row.attempts >= 5) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+  if (!(await bcrypt.compare(String(code || '').trim(), row.code_hash))) {
+    await pool.query('UPDATE password_resets SET attempts=attempts+1 WHERE id=$1', [row.id]);
+    return res.status(400).json({ error: 'Wrong code' });
+  }
+  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(new_password, 10), row.user_id]);
+  await pool.query('DELETE FROM password_resets WHERE user_id=$1', [row.user_id]);
+  res.json({ message: 'Password updated. Log in with your new password.' });
+}));
+
+app.post('/api/account/password', auth, strict, wrap(async (req, res) => {
+  const u = (await pool.query('SELECT password_hash FROM users WHERE id=$1', [req.user.id])).rows[0];
+  if (!u || !(await bcrypt.compare(String(req.body.current_password || ''), u.password_hash)))
+    return res.status(403).json({ error: 'Current password is wrong' });
+  if (!validPw(req.body.new_password)) return res.status(400).json({ error: 'New password must be 8+ characters' });
+  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(req.body.new_password, 10), req.user.id]);
+  res.json({ message: 'Password changed' });
+}));
+
+// ---------- admin (role checked in the database, not the token) ----------
+const admin = (req, res, next) =>
+  pool.query('SELECT role FROM users WHERE id=$1', [req.user.id])
+    .then((r) => (r.rows[0]?.role === 'admin' ? next() : res.status(403).json({ error: 'Admins only' })))
+    .catch(() => res.status(500).json({ error: 'Server error' }));
+
+app.get('/api/admin/items', auth, admin, wrap(async (req, res) => {
+  const r = await pool.query(
+    `SELECT i.id, i.type, i.title, i.status, i.hidden, i.created_at, u.full_name AS poster,
+       (SELECT count(*) FROM reports r WHERE r.item_id=i.id)::int AS reports
+     FROM items i JOIN users u ON u.id=i.posted_by
+     ORDER BY reports DESC, i.created_at DESC LIMIT 200`);
+  res.json(r.rows);
+}));
+
+app.patch('/api/admin/items/:id/hide', auth, admin, wrap(async (req, res) => {
+  await pool.query('UPDATE items SET hidden=$1 WHERE id=$2', [!!req.body.hidden, req.params.id]);
+  res.json({ message: req.body.hidden ? 'Hidden' : 'Visible again' });
+}));
+
+app.delete('/api/admin/items/:id', auth, admin, wrap(async (req, res) => {
+  await pool.query('DELETE FROM items WHERE id=$1', [req.params.id]);
+  res.json({ message: 'Deleted' });
+}));
+
+// Permanently deletes the account, its items and its claims, freeing the email to register again.
+// Wrong password returns 403 (not 401) so the app doesn't treat it as an expired login.
+app.delete('/api/account', auth, strict, wrap(async (req, res) => {
+  const u = (await pool.query('SELECT password_hash FROM users WHERE id=$1', [req.user.id])).rows[0];
+  if (!u) return res.status(404).json({ error: 'Account not found' });
+  if (!(await bcrypt.compare(String(req.body.password || ''), u.password_hash)))
+    return res.status(403).json({ error: 'Wrong password' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM claims WHERE claimant_id=$1', [req.user.id]);
+    await client.query('DELETE FROM items WHERE posted_by=$1', [req.user.id]); // cascades verifications + claims on them
+    await client.query('DELETE FROM users WHERE id=$1', [req.user.id]);
+    await client.query('COMMIT');
+    res.json({ message: 'Account deleted' });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }));
 
 app.get('/health', (_, res) => res.send('ok'));
