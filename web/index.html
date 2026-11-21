@@ -193,8 +193,8 @@ function renderList() {
   $('list').innerHTML = items.map(i => {
     const st = i.status === 'CLAIM_PENDING' ? 'Claim pending' : i.status === 'VERIFIED' ? 'Verified' : '';
     let action = '';
-    if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="claim" data-id="${i.id}">This is mine</button>`;
-    else if (i.status === 'VERIFIED') action = `<button class="btn alt" data-act="contact" data-id="${i.id}">Get finder's contact</button>`;
+    if (i.mine) action = '<div class="meta" style="margin-top:10px"><b>Your post</b></div>';
+    else if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="claim" data-id="${i.id}">This is mine</button>`;
     return `<article class="card">
       <div class="media">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : boxIcon}
         <span class="badge ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span>${st ? `<span class="state">${st}</span>` : ''}</div>
@@ -265,14 +265,29 @@ async function postItem(btn) {
 
 // ---------- claims (finder) ----------
 async function viewClaims() {
-  $('app').innerHTML = '<h2 style="margin:0 0 12px">Claims on your items</h2><div id="cl"><div class="sk" style="height:110px"></div></div>';
-  try {
-    const c = await api('/api/my/claims');
+  $('app').innerHTML = `<h2 style="margin:0 0 12px">Claims on your items</h2><div id="cl"><div class="sk" style="height:110px"></div></div>
+    <h2 style="margin:22px 0 12px">Items you claimed</h2><div id="cd"><div class="sk" style="height:110px"></div></div>`;
+  api('/api/my/claims').then(c => {
     $('cl').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
       <div class="meta">${esc(x.claimant)} answered your question correctly · ${ago(x.created_at)}</div>
       <button class="btn sm" data-act="approve" data-id="${x.id}">Approve</button><button class="btn sm alt" data-act="reject" data-id="${x.id}">Reject</button></div></div>`).join('')
-      : `<div class="empty"><svg width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/></svg><b>No claims waiting</b>When an owner answers your secret question correctly, it shows up here.</div>`;
-  } catch (e) { $('cl').innerHTML = `<div class="empty"><b>Can't load claims</b>${esc(e.message)}</div>`; }
+      : `<div class="empty"><b>No claims waiting</b>When an owner answers your secret question correctly, it shows up here.</div>`;
+  }).catch(e => { $('cl').innerHTML = `<div class="empty"><b>Can't load claims</b>${esc(e.message)}</div>`; });
+  api('/api/my/claimed').then(c => {
+    $('cd').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
+      <div class="meta">${x.claim_status === 'APPROVED' ? 'Approved. Meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the finder to approve.'}</div>
+      ${x.claim_status === 'APPROVED' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button><button class="btn sm alt" data-act="gotit" data-id="${x.id}">I received it</button>` : ''}</div></div>`).join('')
+      : `<div class="empty"><b>Nothing claimed yet</b>Found something that's yours? Tap "This is mine" in Browse.</div>`;
+  }).catch(e => { $('cd').innerHTML = `<div class="empty"><b>Can't load your claims</b>${esc(e.message)}</div>`; });
+}
+function gotItSheet(id) {
+  openSheet(`<h2>Did you get it back?</h2><p>Only confirm after the item is in your hands. This closes the post and can't be undone.</p>
+    <button class="btn" data-act="gotitgo" data-id="${id}">Yes, I received it</button><button class="btn alt" data-act="closesheet">Not yet</button>`);
+}
+async function gotItGo(id, btn) {
+  btn.disabled = true;
+  try { await api(`/api/items/${id}/resolve`, 'PATCH'); closeSheet(); toast('Great. Marked as returned.'); viewClaims(); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
 }
 async function decide(id, act) { try { await api(`/api/claims/${id}/${act}`, 'PATCH'); toast(act === 'approve' ? 'Approved. The owner can now see your contact.' : 'Rejected'); viewClaims(); } catch (e) { toast(e.message, true); } }
 
@@ -367,15 +382,42 @@ function authSheet(mode, why) {
     ${reg ? '' : '<div style="text-align:center"><button class="link" data-act="forgot">Forgot password?</button></div>'}</div><div class="gfoot">Only registered students can browse and post.</div></div>`;
   $('gate').classList.remove('hidden');
 }
+let regForm = null;
+function finishLogin(d) {
+  token = d.token; user = d.user; localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
+  $('gate').classList.add('hidden'); applyAuthState(); toast('Welcome, ' + user.full_name.split(' ')[0]); go('browse');
+}
 async function authGo(btn) {
   if (token) return toast('Log out first to use a different account', true);
   btn.disabled = true;
   try {
-    const reg = authMode === 'register';
-    const d = await api(reg ? '/api/auth/register' : '/api/auth/login', 'POST', { full_name: $('aname')?.value, student_email: $('aemail').value, phone: $('aphone')?.value, password: $('apass').value });
-    token = d.token; user = d.user; localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
-    $('gate').classList.add('hidden'); applyAuthState(); toast('Welcome, ' + user.full_name.split(' ')[0]); go('browse');
+    if (authMode === 'register') {
+      regForm = { full_name: $('aname').value, student_email: $('aemail').value, phone: $('aphone').value, password: $('apass').value };
+      await api('/api/auth/register/start', 'POST', regForm);
+      return regVerifyScreen();
+    }
+    finishLogin(await api('/api/auth/login', 'POST', { student_email: $('aemail').value, password: $('apass').value }));
   } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+function regVerifyScreen() {
+  $('gate').innerHTML = `<div class="gwrap"><div class="logo"><div class="mark"><svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><div><b>Campus Find</b><small>Lost and found for students</small></div></div>
+    <div class="gcard"><h2>Verify your phone</h2><p>We texted a 6-digit code to ${esc(regForm.phone)}. It lasts 10 minutes.</p>
+    <input class="field" id="rcode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6-digit code">
+    <button class="btn" data-act="regverify">Verify and create account</button>
+    <button class="btn alt" data-act="regresend">Send a new code</button>
+    <div style="text-align:center"><button class="link" data-act="regback">Wrong number? Go back</button></div></div></div>`;
+}
+async function regVerify(btn) {
+  const code = $('rcode').value.trim(); if (!code) return toast('Enter the 6-digit code', true);
+  btn.disabled = true;
+  try { const d = await api('/api/auth/register/verify', 'POST', { student_email: regForm.student_email, code }); regForm = null; finishLogin(d); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+async function regResend(btn) {
+  btn.disabled = true;
+  try { await api('/api/auth/register/start', 'POST', regForm); toast('New code sent'); }
+  catch (e) { toast(e.message, true); }
+  btn.disabled = false;
 }
 function applyAuthState() { document.body.classList.toggle('authed', !!token); }
 function endSession(msg) {
@@ -396,7 +438,8 @@ async function viewMine() {
       <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${CATS[x.category] || ''}</span><span class="pill">${STATUS[x.status]}</span></div>
       <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</div>
       ${x.pending_claims ? `<div class="meta" style="color:var(--found);font-weight:600">${x.pending_claims} claim waiting</div><button class="btn sm" data-tab="claims">Review claims</button>` : ''}
-      ${x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">Mark returned</button>` : ''}</div></div>`).join('')
+      ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">I found it</button>` : ''}
+      ${x.type === 'FOUND' && x.status === 'VERIFIED' ? '<div class="meta">Waiting for the owner to confirm they received it.</div>' : ''}</div></div>`).join('')
       : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
   } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
 }
@@ -507,6 +550,11 @@ document.addEventListener('click', e => {
   else if (act === 'closesheet') closeSheet();
   else if (act === 'logoutall') logoutAllSheet();
   else if (act === 'logoutallgo') logoutAllGo(t);
+  else if (act === 'regverify') regVerify(t);
+  else if (act === 'regresend') regResend(t);
+  else if (act === 'regback') authSheet('register');
+  else if (act === 'gotit') gotItSheet(id);
+  else if (act === 'gotitgo') gotItGo(id, t);
   else if (act === 'privacy') viewPrivacy();
   else if (act === 'editprof') editProfSheet();
   else if (act === 'profsave') saveProfile(t);
