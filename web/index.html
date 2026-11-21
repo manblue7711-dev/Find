@@ -18,6 +18,7 @@ body::before{content:"";position:fixed;inset:0;background:var(--art) center bott
 .eye{position:absolute;right:6px;top:6px;border:0;background:none;color:var(--primary);font:inherit;font-weight:600;padding:8px 10px;cursor:pointer}
 .btn.danger{background:var(--lostbg);color:var(--lost)}
 .link{border:0;background:none;color:var(--mute);font:inherit;font-size:13px;padding:8px 0 0;cursor:pointer;text-decoration:underline}
+.prow{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid var(--line)}.prow:last-of-type{border-bottom:0}.prow span{color:var(--mute);flex:none}.prow b{font-weight:600;text-align:right;word-break:break-all}
 .pill{font-size:12px;font-weight:600;color:var(--mute)}
 body:not(.authed) #shell,body:not(.authed) nav{display:none}
 #gate{position:fixed;inset:0;z-index:7;overflow-y:auto;display:flex;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom))}
@@ -276,14 +277,82 @@ async function viewClaims() {
 async function decide(id, act) { try { await api(`/api/claims/${id}/${act}`, 'PATCH'); toast(act === 'approve' ? 'Approved. The owner can now see your contact.' : 'Rejected'); viewClaims(); } catch (e) { toast(e.message, true); } }
 
 // ---------- account / auth ----------
-function viewAccount() {
-  $('app').innerHTML = `${user ? `<div class="who"><div class="av">${esc((user.full_name || '?')[0].toUpperCase())}</div><div><b>${esc(user.full_name)}</b><div class="meta" style="margin:0">Signed in</div></div></div>
+let profile = null, acctView = 'account';
+const prow = (k, v) => `<div class="prow"><span>${k}</span><b>${esc(v)}</b></div>`;
+const fmtDate = (d) => new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+async function loadProfile() {
+  profile = await api('/api/account');
+  user = { ...user, full_name: profile.full_name, role: profile.role };
+  localStorage.setItem('user', JSON.stringify(user));
+  return profile;
+}
+async function viewAccount() {
+  acctView = 'account';
+  $('app').innerHTML = '<div class="sk" style="height:140px"></div>';
+  try {
+    const p = await loadProfile();
+    $('app').innerHTML = `<div class="who"><div class="av">${esc(p.full_name[0].toUpperCase())}</div><div style="min-width:0"><b>${esc(p.full_name)}</b><div class="meta" style="margin:0;word-break:break-all">${esc(p.student_email)}</div></div></div>
+    <div class="card"><div class="body">
+      ${prow('Full name', p.full_name)}${prow('Student email', p.student_email)}${prow('Phone', p.phone)}${prow('Member since', fmtDate(p.created_at))}${p.role === 'admin' ? prow('Role', 'Admin') : ''}
+      <button class="btn sm alt" data-act="editprof">Edit profile</button></div></div>
     <button class="btn alt" data-act="mine" style="margin:0 0 10px">My posts</button>
     <button class="btn alt" data-act="chpw" style="margin:0 0 10px">Change password</button>
-    ${user.role === 'admin' ? '<button class="btn alt" data-act="admin" style="margin:0 0 10px">Admin panel</button>' : ''}
-    <button class="btn alt" data-act="logout" style="margin:0 0 10px">Log out</button>
-    <button class="btn danger" data-act="delask" style="margin:0 0 14px">Delete account</button>` : `<div class="empty" style="padding:24px"><b>Sign in to report and claim</b>You can browse without an account.<button class="btn" data-act="login">Log in or register</button></div>`}
-  <div class="tips"><b>Stay safe</b><br>Meet only at the listed hand-off spots, in daylight, and never share a PIN or full card number. Real owners can answer the secret question without help.</div>`;
+    <button class="btn alt" data-act="privacy" style="margin:0 0 10px">Privacy &amp; security</button>
+    ${p.role === 'admin' ? '<button class="btn alt" data-act="admin" style="margin:0 0 10px">Admin panel</button>' : ''}
+    <button class="btn danger" data-act="logout" style="margin:18px 0 0">Log out</button>`;
+  } catch (e) { $('app').innerHTML = `<div class="empty"><b>Can't load your profile</b>${esc(e.message)}<button class="btn alt" data-act="retryacct">Try again</button></div>`; }
+}
+async function viewPrivacy() {
+  acctView = 'privacy';
+  try { if (!profile) await loadProfile(); } catch (e) { return toast(e.message, true); }
+  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">Privacy &amp; security</h2>
+  <div class="card"><div class="body"><h3>Your sign-in details</h3>
+    ${prow('Email', profile.student_email)}${prow('Phone', profile.phone)}${prow('Password', '•••••••• (hidden)')}
+    <div class="hint" style="margin:8px 0 0">Passwords are stored scrambled, so nobody can read yours, including us. You can set a new one any time.</div>
+    <button class="btn sm alt" data-act="editprof">Edit details</button><button class="btn sm alt" data-act="chpw">Change password</button></div></div>
+  <div class="card"><div class="body"><h3>Who sees what</h3>
+    <div class="meta">Your phone number stays hidden until you approve someone's claim on your item.</div>
+    <div class="meta">ID numbers in posts are masked, like PS/CSC/22/****.</div>
+    <div class="meta">Secret answers are stored scrambled and never shown.</div></div></div>
+  <div class="card"><div class="body"><h3>Your data</h3>
+    <div class="meta">Get a copy of your profile, posts and claims.</div>
+    <button class="btn sm alt" data-act="export">Download my data</button></div></div>
+  <div class="card"><div class="body"><h3>Sign out or leave</h3>
+    <button class="btn alt" data-act="logout" style="margin-top:8px">Sign out of this device</button>
+    <button class="btn alt" data-act="logoutall" style="margin-top:10px">Sign out of all devices</button>
+    <button class="btn danger" data-act="delask" style="margin-top:10px">Delete account</button></div></div>
+  <div class="tips"><b>Stay safe</b><br>Meet only at the listed hand-off spots, in daylight, and never share a PIN or full card number.</div>`;
+}
+function editProfSheet() {
+  openSheet(`<h2>Edit profile</h2><p>Your email can't be changed.</p>
+    <label class="l">Full name</label><input class="field" id="epname" value="${esc(profile.full_name)}" autocomplete="name">
+    <label class="l">Phone</label><input class="field" id="epphone" type="tel" value="${esc(profile.phone)}" autocomplete="tel">
+    <button class="btn" data-act="profsave">Save changes</button>`);
+}
+async function saveProfile(btn) {
+  btn.disabled = true;
+  try {
+    const d = await api('/api/account', 'PATCH', { full_name: $('epname').value, phone: $('epphone').value });
+    profile = { ...profile, ...d }; user = { ...user, full_name: d.full_name }; localStorage.setItem('user', JSON.stringify(user));
+    closeSheet(); toast('Profile updated'); acctView === 'privacy' ? viewPrivacy() : viewAccount();
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+function logoutAllSheet() {
+  openSheet(`<h2>Sign out everywhere?</h2><p>Every phone or browser signed in to your account will be logged out, including this one.</p>
+    <button class="btn danger" data-act="logoutallgo">Sign out of all devices</button>
+    <button class="btn alt" data-act="closesheet">Cancel</button>`);
+}
+async function logoutAllGo(btn) {
+  btn.disabled = true;
+  try { await api('/api/account/logout-all', 'POST'); endSession('You were signed out of all devices.'); }
+  catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+async function exportData() {
+  try {
+    const d = await api('/api/account/export');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type:'application/json' }));
+    a.download = 'campus-find-my-data.json'; document.body.appendChild(a); a.click(); a.remove(); toast('Download started');
+  } catch (e) { toast(e.message, true); }
 }
 let authMode = 'login';
 function authSheet(mode, why) {
@@ -369,7 +438,7 @@ function chpwSheet() {
 }
 async function chpwGo(btn) {
   btn.disabled = true;
-  try { const d = await api('/api/account/password', 'POST', { current_password: $('cpw').value, new_password: $('npw').value }); closeSheet(); toast(d.message); }
+  try { const d = await api('/api/account/password', 'POST', { current_password: $('cpw').value, new_password: $('npw').value }); if (d.token) { token = d.token; localStorage.setItem('token', token); } closeSheet(); toast(d.message); }
   catch (e) { toast(e.message, true); btn.disabled = false; }
 }
 
@@ -436,6 +505,13 @@ document.addEventListener('click', e => {
   else if (act === 'delask') delSheet();
   else if (act === 'delgo') delGo(t);
   else if (act === 'closesheet') closeSheet();
+  else if (act === 'logoutall') logoutAllSheet();
+  else if (act === 'logoutallgo') logoutAllGo(t);
+  else if (act === 'privacy') viewPrivacy();
+  else if (act === 'editprof') editProfSheet();
+  else if (act === 'profsave') saveProfile(t);
+  else if (act === 'export') exportData();
+  else if (act === 'retryacct') viewAccount();
   else if (act === 'mine') viewMine();
   else if (act === 'markret') markReturned(id);
   else if (act === 'report') reportSheet(id);
