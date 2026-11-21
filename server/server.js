@@ -69,13 +69,15 @@ function ghPhone(p) {
 async function sendSms(phones, message) {
   const key = process.env.ARKESEL_API_KEY;
   const recipients = [...new Set(phones.map(ghPhone).filter(Boolean))];
-  if (!key || !recipients.length) return;
+  if (!key || !recipients.length) return false;
   const r = await fetch('https://sms.arkesel.com/api/v2/sms/send', {
     method: 'POST',
     headers: { 'api-key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({ sender: process.env.ARKESEL_SENDER || 'CampusFind', message, recipients }),
   });
-  if (!r.ok) console.error('Arkesel error', r.status, await r.text());
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || (d.status && d.status !== 'success')) { console.error('Arkesel error', r.status, JSON.stringify(d)); return false; }
+  return true;
 }
 
 const words = (s) => new Set(norm(s).split(/[^a-z0-9]+/).filter((w) => w.length >= 3));
@@ -101,24 +103,72 @@ async function notifyMatches(foundId) {
     `Campus Find: a found item may match something you reported lost. Check it here: ${url}`);
 }
 
+async function phoneTaken(phone, exceptId) {
+  const n = ghPhone(phone);
+  const variants = [String(phone).trim()];
+  if (n) variants.push(n, '0' + n.slice(3));
+  const r = await pool.query('SELECT 1 FROM users WHERE phone = ANY($1) AND id <> $2 LIMIT 1', [variants, exceptId || 0]);
+  return !!r.rows[0];
+}
+
+const validPw = (p) => typeof p === 'string' && p.length >= 8;
+
 // ---------- auth ----------
-app.post('/api/auth/register', strict, wrap(async (req, res) => {
+// Step 1: validate, then text a 6-digit code. No account exists yet.
+app.post('/api/auth/register/start', strict, wrap(async (req, res) => {
   const { full_name, student_email, phone, password } = req.body;
-  if (!full_name || !student_email || !phone || !password || password.length < 8)
+  const email = norm(student_email), name = String(full_name || '').trim();
+  if (name.length < 2 || !email.includes('@') || !validPw(password))
     return res.status(400).json({ error: 'All fields required; password min 8 chars' });
-  const hash = await bcrypt.hash(password, 10);
+  const gh = ghPhone(phone);
+  if (!gh) return res.status(400).json({ error: 'Enter a valid Ghana phone number, e.g. 024 123 4567' });
+  if ((await pool.query('SELECT 1 FROM users WHERE student_email=$1', [email])).rows[0])
+    return res.status(409).json({ error: 'Email already registered' });
+  if (await phoneTaken(phone))
+    return res.status(409).json({ error: 'That phone number is already registered to another account' });
+  const recent = (await pool.query(
+    "SELECT 1 FROM pending_registrations WHERE student_email=$1 AND created_at > now() - interval '60 seconds'", [email])).rows[0];
+  if (recent) return res.status(429).json({ error: 'Wait a minute before asking for another code' });
+
+  const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  if (!(await sendSms([gh], `Campus Find: your verification code is ${code}. It expires in 10 minutes.`)))
+    return res.status(502).json({ error: 'Could not send the SMS code. Check the number and try again.' });
+  await pool.query(
+    `INSERT INTO pending_registrations (student_email, full_name, phone, password_hash, code_hash, expires_at)
+     VALUES ($1,$2,$3,$4,$5, now() + interval '10 minutes')
+     ON CONFLICT (student_email) DO UPDATE SET full_name=$2, phone=$3, password_hash=$4, code_hash=$5,
+       expires_at=now() + interval '10 minutes', attempts=0, created_at=now()`,
+    [email, name, String(phone).trim(), await bcrypt.hash(password, 10), await bcrypt.hash(code, 10)]);
+  res.json({ message: 'Code sent by SMS' });
+}));
+
+// Step 2: right code creates the account and signs the person in.
+app.post('/api/auth/register/verify', strict, wrap(async (req, res) => {
+  const email = norm(req.body.student_email);
+  const p = (await pool.query(
+    'SELECT * FROM pending_registrations WHERE student_email=$1 AND expires_at > now()', [email])).rows[0];
+  if (!p || p.attempts >= 5) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+  if (!(await bcrypt.compare(String(req.body.code || '').trim(), p.code_hash))) {
+    await pool.query('UPDATE pending_registrations SET attempts=attempts+1 WHERE student_email=$1', [email]);
+    return res.status(400).json({ error: 'Wrong code' });
+  }
+  if (await phoneTaken(p.phone)) return res.status(409).json({ error: 'That phone number is already registered to another account' });
   try {
     const r = await pool.query(
-      `INSERT INTO users (full_name, student_email, phone, password_hash)
-       VALUES ($1,$2,$3,$4) RETURNING id, full_name, role`,
-      [full_name.trim(), norm(student_email), phone.trim(), hash]);
+      `INSERT INTO users (full_name, student_email, phone, password_hash) VALUES ($1,$2,$3,$4)
+       RETURNING id, full_name, role, token_version`, [p.full_name, p.student_email, p.phone, p.password_hash]);
     const u = r.rows[0];
-    res.json({ token: jwt.sign({ id: u.id, role: u.role, tv: u.token_version || 0 }, JWT_SECRET, { expiresIn: '30d' }), user: u });
+    await pool.query('DELETE FROM pending_registrations WHERE student_email=$1', [email]);
+    res.json({
+      token: jwt.sign({ id: u.id, role: u.role, tv: u.token_version || 0 }, JWT_SECRET, { expiresIn: '30d' }),
+      user: { id: u.id, full_name: u.full_name, role: u.role },
+    });
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
     throw e;
   }
 }));
+
 
 app.post('/api/auth/login', strict, wrap(async (req, res) => {
   const { student_email, password } = req.body;
@@ -141,10 +191,12 @@ app.get('/api/items', auth, wrap(async (req, res) => {
   if (type) { vals.push(type); where.push(`i.type=$${vals.length}`); }
   if (category) { vals.push(category); where.push(`i.category=$${vals.length}`); }
   if (q) { vals.push(`%${q}%`); where.push(`(i.title ILIKE $${vals.length} OR i.masked_identifier ILIKE $${vals.length} OR i.location ILIKE $${vals.length})`); }
+  vals.push(req.user.id);
+  const me = vals.length;
   const r = await pool.query(
     `SELECT i.id, i.type, i.category, i.title, i.description, i.masked_identifier,
             i.location, i.handoff_zone, i.image_url, i.status, i.created_at,
-            v.security_question
+            v.security_question, (i.posted_by = $${me}) AS mine
      FROM items i LEFT JOIN verifications v ON v.item_id = i.id
      WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC LIMIT 100`, vals);
   res.json(r.rows);
@@ -195,6 +247,9 @@ app.post('/api/items/:id/claim', auth, strict, wrap(async (req, res) => {
   const item = r.rows[0];
   if (!item) return res.status(404).json({ error: 'Item not found or not claimable' });
   if (item.posted_by === req.user.id) return res.status(400).json({ error: 'You posted this item' });
+  const ph = (await pool.query('SELECT phone FROM users WHERE id = ANY($1::int[])', [[item.posted_by, req.user.id]])).rows;
+  if (new Set(ph.map((u) => ghPhone(u.phone) || u.phone)).size < 2)
+    return res.status(400).json({ error: 'You cannot claim an item posted from your own phone number' });
   if (item.status !== 'OPEN') return res.status(409).json({ error: 'Item already has a pending claim' });
 
   const matched = await bcrypt.compare(norm(req.body.answer), item.expected_answer_hash);
@@ -259,13 +314,26 @@ app.get('/api/items/:id/contact', auth, wrap(async (req, res) => {
   res.json({ finder: row.full_name, phone: row.phone, handoff_zone: row.handoff_zone });
 }));
 
+// Who may close an item:
+//  - admins (porters): any item
+//  - the owner of a LOST report (they found it themselves)
+//  - the approved claimant of a FOUND item, confirming they received it
+// The finder can NOT mark their own found item as returned.
 app.patch('/api/items/:id/resolve', auth, wrap(async (req, res) => {
-  const r = await pool.query(
-    "UPDATE items SET status='RETURNED' WHERE id=$1 AND (posted_by=$2 OR $3='admin') RETURNING id",
-    [req.params.id, req.user.id, req.user.role]);
-  if (!r.rows[0]) return res.status(404).json({ error: 'Item not found' });
+  const it = (await pool.query('SELECT type, posted_by, status FROM items WHERE id=$1', [req.params.id])).rows[0];
+  if (!it) return res.status(404).json({ error: 'Item not found' });
+  const role = (await pool.query('SELECT role FROM users WHERE id=$1', [req.user.id])).rows[0]?.role;
+  let allowed = role === 'admin';
+  if (!allowed && it.type === 'LOST') allowed = it.posted_by === req.user.id;
+  if (!allowed && it.type === 'FOUND' && it.status === 'VERIFIED') {
+    const c = await pool.query("SELECT 1 FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='APPROVED'", [req.params.id, req.user.id]);
+    allowed = !!c.rows[0];
+  }
+  if (!allowed) return res.status(403).json({ error: 'Only the owner can confirm the item was received' });
+  await pool.query("UPDATE items SET status='RETURNED' WHERE id=$1", [req.params.id]);
   res.json({ message: 'Marked as returned' });
 }));
+
 
 // ---------- my posts ----------
 app.get('/api/my/items', auth, wrap(async (req, res) => {
@@ -273,6 +341,16 @@ app.get('/api/my/items', auth, wrap(async (req, res) => {
     `SELECT id, type, category, title, image_url, status, hidden, created_at,
        (SELECT count(*) FROM claims c WHERE c.item_id=items.id AND c.status='PENDING' AND c.answer_matched)::int AS pending_claims
      FROM items WHERE posted_by=$1 ORDER BY created_at DESC`, [req.user.id]);
+  res.json(r.rows);
+}));
+
+// Items I have claimed (so I can get the contact and confirm receipt).
+app.get('/api/my/claimed', auth, wrap(async (req, res) => {
+  const r = await pool.query(
+    `SELECT i.id, i.title, i.handoff_zone, c.status AS claim_status, c.created_at
+     FROM claims c JOIN items i ON i.id=c.item_id
+     WHERE c.claimant_id=$1 AND c.answer_matched AND c.status IN ('PENDING','APPROVED') AND i.status <> 'RETURNED'
+     ORDER BY c.created_at DESC`, [req.user.id]);
   res.json(r.rows);
 }));
 
@@ -291,7 +369,6 @@ app.post('/api/items/:id/report', auth, strict, wrap(async (req, res) => {
 }));
 
 // ---------- passwords ----------
-const validPw = (p) => typeof p === 'string' && p.length >= 8;
 
 app.post('/api/auth/forgot', strict, wrap(async (req, res) => {
   const u = (await pool.query('SELECT id, phone FROM users WHERE student_email=$1',
@@ -377,6 +454,7 @@ app.patch('/api/account', auth, wrap(async (req, res) => {
   const phone = String(req.body.phone || '').trim();
   if (name.length < 2 || !ghPhone(phone))
     return res.status(400).json({ error: 'Enter your full name and a valid phone, e.g. 024 123 4567' });
+  if (await phoneTaken(phone, req.user.id)) return res.status(409).json({ error: 'That phone number is already registered to another account' });
   await pool.query('UPDATE users SET full_name=$1, phone=$2 WHERE id=$3', [name, phone, req.user.id]);
   res.json({ full_name: name, phone });
 }));
