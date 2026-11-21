@@ -126,7 +126,7 @@ app.post('/api/auth/login', strict, wrap(async (req, res) => {
 
 // ---------- items ----------
 // Public feed: never exposes phone, raw identifier, or the answer.
-app.get('/api/items', wrap(async (req, res) => {
+app.get('/api/items', auth, wrap(async (req, res) => {
   const { type, category, q } = req.query;
   const where = ["i.status <> 'RETURNED'", 'i.hidden = false', "i.created_at > now() - interval '60 days'"];
   const vals = [];
