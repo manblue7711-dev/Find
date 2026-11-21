@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Find</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --text:#1c1c1a; --muted:#6b6b66; --line:#e3e3df; --accent:#0f6e56; --warn:#b3261e; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --card:#222221; --text:#f2f2ee; --muted:#a0a09a; --line:#333331; --accent:#3ecf9e; --warn:#ff8a80; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); }
+  h1 { font-size:18px; margin:0; }
+  main { max-width:640px; margin:0 auto; padding:12px 16px 80px; }
+  input, select, textarea, button { font:inherit; width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); margin-bottom:8px; }
+  button { background:var(--accent); color:#fff; border:0; cursor:pointer; font-weight:600; }
+  button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  button.sm { width:auto; padding:6px 12px; margin:0; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; }
+  .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--muted); margin-right:4px; }
+  .muted { color:var(--muted); font-size:14px; } .err { color:var(--warn); }
+  img.thumb { width:100%; max-height:180px; object-fit:cover; border-radius:8px; margin-bottom:8px; }
+  .hidden { display:none; }
+  nav { display:flex; gap:6px; margin-bottom:12px; } nav button { margin:0; }
+</style>
+</head>
+<body>
+<header><h1>Campus Find</h1><button class="sm ghost" id="authBtn"></button></header>
+<main>
+  <nav>
+    <button class="ghost" data-view="feed">Browse</button>
+    <button class="ghost" data-view="post">Report</button>
+    <button class="ghost" data-view="mine">My claims</button>
+  </nav>
+  <p id="msg" class="muted"></p>
+
+  <section id="feed">
+    <input id="q" placeholder="Search e.g. CSC, phone, library">
+    <div class="row">
+      <select id="ftype"><option value="">All</option><option>FOUND</option><option>LOST</option></select>
+      <select id="fcat"><option value="">Any category</option><option>ID_CARD</option><option>PHONE</option><option>CARD</option><option>BAG</option><option>KEYS</option><option>OTHER</option></select>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <section id="post" class="hidden">
+    <select id="ptype"><option>FOUND</option><option>LOST</option></select>
+    <select id="pcat"><option>ID_CARD</option><option>PHONE</option><option>CARD</option><option>BAG</option><option>KEYS</option><option>OTHER</option></select>
+    <input id="ptitle" placeholder="Title (e.g. Black Tecno phone)">
+    <textarea id="pdesc" rows="2" placeholder="Description (no sensitive numbers)"></textarea>
+    <input id="pid" placeholder="ID number, if any (will be masked publicly)">
+    <input id="ploc" placeholder="Where it was found/lost">
+    <select id="pzone"><option value="">Handoff spot…</option><option>Main Library Entrance</option><option>Porter's Lodge</option><option>Shuttle Terminal</option><option>Department Office</option></select>
+    <input id="pimg" type="file" accept="image/*">
+    <img id="ppreview" class="thumb hidden" alt="">
+    <div id="secbox">
+      <input id="pq" placeholder="Secret question only the owner can answer">
+      <input id="pa" placeholder="Answer">
+    </div>
+    <button id="submitItem">Post</button>
+  </section>
+
+  <section id="mine" class="hidden"><div id="claims"></div></section>
+
+  <section id="auth" class="hidden">
+    <h3 id="authTitle">Log in</h3>
+    <input id="aname" class="hidden" placeholder="Full name">
+    <input id="aemail" type="email" placeholder="Student email">
+    <input id="aphone" class="hidden" placeholder="Phone">
+    <input id="apass" type="password" placeholder="Password (8+ chars)">
+    <button id="authGo">Continue</button>
+    <button class="ghost" id="authSwap">Need an account? Register</button>
+  </section>
+</main>
+
+<script>
+const API = 'https://campusfind-uid7.onrender.com'; // <- your Render URL
+const CLOUD_NAME = 'deadrpp5';               // <- Cloudinary dashboard
+const UPLOAD_PRESET = 'ca4ry12f';       // <- Settings > Upload > unsigned preset
+
+// Shrink photo on the phone (saves data), then upload straight to Cloudinary.
+async function uploadImage(file) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+  const fd = new FormData();
+  fd.append('file', blob); fd.append('upload_preset', UPLOAD_PRESET);
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error?.message || 'Image upload failed');
+  return d.secure_url;
+}
+let token = localStorage.getItem('token'), registering = false;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function api(path, method='GET', body) {
+  const r = await fetch(API + path, {
+    method, headers: { 'Content-Type':'application/json', ...(token ? { Authorization:'Bearer '+token } : {}) },
+    body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+const say = (t, bad) => { $('msg').textContent = t || ''; $('msg').className = bad ? 'err' : 'muted'; };
+
+function show(view) {
+  for (const v of ['feed','post','mine','auth']) $(v).classList.toggle('hidden', v !== view);
+  if ((view === 'post' || view === 'mine') && !token) return show('auth');
+  if (view === 'feed') loadFeed();
+  if (view === 'mine') loadClaims();
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { say(''); show(b.dataset.view); });
+function renderAuthBtn() { $('authBtn').textContent = token ? 'Log out' : 'Log in'; }
+$('authBtn').onclick = () => { if (token) { token = null; localStorage.removeItem('token'); renderAuthBtn(); show('feed'); } else show('auth'); };
+$('authSwap').onclick = () => {
+  registering = !registering;
+  ['aname','aphone'].forEach(i => $(i).classList.toggle('hidden', !registering));
+  $('authTitle').textContent = registering ? 'Register' : 'Log in';
+  $('authSwap').textContent = registering ? 'Have an account? Log in' : 'Need an account? Register';
+};
+$('authGo').onclick = async () => {
+  try {
+    const d = await api(registering ? '/api/auth/register' : '/api/auth/login', 'POST', {
+      full_name: $('aname').value, student_email: $('aemail').value, phone: $('aphone').value, password: $('apass').value });
+    token = d.token; localStorage.setItem('token', token); renderAuthBtn(); say('Welcome, ' + d.user.full_name); show('feed');
+  } catch (e) { say(e.message, true); }
+};
+
+async function loadFeed() {
+  const p = new URLSearchParams({ type:$('ftype').value, category:$('fcat').value, q:$('q').value });
+  [...p.keys()].forEach(k => !p.get(k) && p.delete(k));
+  try {
+    const items = await api('/api/items?' + p);
+    $('list').innerHTML = items.length ? items.map(i => `
+      <div class="card">
+        ${i.image_url ? `<img class="thumb" src="${esc(i.image_url)}" alt="">` : ''}
+        <span class="tag">${esc(i.type)}</span><span class="tag">${esc(i.category)}</span><span class="tag">${esc(i.status)}</span>
+        <h3 style="margin:6px 0">${esc(i.title)}</h3>
+        ${i.masked_identifier ? `<div class="muted">ID: ${esc(i.masked_identifier)}</div>` : ''}
+        <div class="muted">${esc(i.location)}${i.handoff_zone ? ' · Handoff: ' + esc(i.handoff_zone) : ''}</div>
+        ${i.type === 'FOUND' && i.status === 'OPEN' && i.security_question ? `<button class="sm" style="margin-top:8px" onclick="claim(${i.id}, '${esc(i.security_question).replace(/'/g, '&#39;')}')">This is mine</button>` : ''}
+        ${i.status === 'VERIFIED' ? `<button class="sm ghost" style="margin-top:8px" onclick="contact(${i.id})">Get finder contact</button>` : ''}
+      </div>`).join('') : '<p class="muted">Nothing here yet.</p>';
+  } catch (e) { say(e.message, true); }
+}
+['q','ftype','fcat'].forEach(i => $(i).addEventListener('input', loadFeed));
+
+window.claim = async (id, question) => {
+  if (!token) return show('auth');
+  const ans = prompt(question);
+  if (!ans) return;
+  try { const d = await api(`/api/items/${id}/claim`, 'POST', { answer: ans }); say(d.message); loadFeed(); }
+  catch (e) { say(e.message, true); }
+};
+window.contact = async (id) => {
+  if (!token) return show('auth');
+  try { const d = await api(`/api/items/${id}/contact`); alert(`${d.finder}\n${d.phone}\nMeet at: ${d.handoff_zone || 'agree a public spot'}`); }
+  catch (e) { say(e.message, true); }
+};
+
+$('ptype').onchange = () => $('secbox').classList.toggle('hidden', $('ptype').value !== 'FOUND');
+$('pimg').onchange = () => {
+  const f = $('pimg').files[0];
+  $('ppreview').classList.toggle('hidden', !f);
+  if (f) $('ppreview').src = URL.createObjectURL(f);
+};
+$('submitItem').onclick = async () => {
+  const btn = $('submitItem'); btn.disabled = true;
+  try {
+    const file = $('pimg').files[0];
+    if (file) say('Uploading photo…');
+    const image_url = file ? await uploadImage(file) : null;
+    await api('/api/items', 'POST', {
+      type:$('ptype').value, category:$('pcat').value, title:$('ptitle').value, description:$('pdesc').value,
+      identifier:$('pid').value, location:$('ploc').value, handoff_zone:$('pzone').value, image_url,
+      security_question:$('pq').value, security_answer:$('pa').value });
+    say('Posted.'); ['ptitle','pdesc','pid','ploc','pimg','pq','pa'].forEach(i => $(i).value = '');
+    $('ppreview').classList.add('hidden'); show('feed');
+  } catch (e) { say(e.message, true); }
+  btn.disabled = false;
+};
+
+async function loadClaims() {
+  try {
+    const c = await api('/api/my/claims');
+    $('claims').innerHTML = c.length ? c.map(x => `
+      <div class="card"><b>${esc(x.title)}</b><div class="muted">${esc(x.claimant)} answered correctly</div>
+      <div class="row" style="margin-top:8px"><button class="sm" onclick="decide(${x.id},'approve')">Approve</button>
+      <button class="sm ghost" onclick="decide(${x.id},'reject')">Reject</button></div></div>`).join('')
+      : '<p class="muted">No pending claims.</p>';
+  } catch (e) { say(e.message, true); }
+}
+window.decide = async (id, act) => { try { await api(`/api/claims/${id}/${act}`, 'PATCH'); loadClaims(); } catch (e) { say(e.message, true); } };
+
+renderAuthBtn(); show('feed');
+</script>
+</body>
+</html>
