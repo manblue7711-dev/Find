@@ -19,6 +19,15 @@ body::before{content:"";position:fixed;inset:0;background:var(--art) center bott
 .btn.danger{background:var(--lostbg);color:var(--lost)}
 .link{border:0;background:none;color:var(--mute);font:inherit;font-size:13px;padding:8px 0 0;cursor:pointer;text-decoration:underline}
 .pill{font-size:12px;font-weight:600;color:var(--mute)}
+body:not(.authed) #shell,body:not(.authed) nav{display:none}
+#gate{position:fixed;inset:0;z-index:7;overflow-y:auto;display:flex;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom))}
+.gwrap{width:100%;max-width:420px;margin:auto 0}
+.logo{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.mark{width:50px;height:50px;border-radius:15px;background:var(--primary);color:var(--on);display:grid;place-items:center}
+.logo b{font-size:25px;letter-spacing:-.4px;display:block;line-height:1.1}.logo small{color:var(--mute)}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px}
+.gcard h2{margin:0 0 4px;font-size:20px}.gcard p{margin:0 0 14px;color:var(--mute)}
+.gfoot{text-align:center;color:var(--mute);font-size:12px;margin-top:14px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
 #shell{max-width:520px;margin:0 auto;min-height:100dvh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
@@ -99,6 +108,7 @@ nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);co
   <button data-tab="claims"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Claims</button>
   <button data-tab="account"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Account</button>
 </nav>
+<div id="gate" class="hidden"></div>
 <div class="veil" id="veil"></div>
 <div class="sheet" id="sheet"></div>
 <div id="toast"></div>
@@ -127,7 +137,7 @@ async function api(path, method = 'GET', body) {
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:'Bearer ' + token } : {}) },
     body: body ? JSON.stringify(body) : undefined });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) { if (r.status === 401) logout(true); throw new Error(d.error || 'Something went wrong. Try again.'); }
+  if (!r.ok) { if (r.status === 401 && token) endSession('Your session expired. Log in again.'); throw new Error(d.error || 'Something went wrong. Try again.'); }
   return d;
 }
 function toast(msg, bad) {
@@ -278,27 +288,33 @@ function viewAccount() {
 let authMode = 'login';
 function authSheet(mode, why) {
   authMode = mode; const reg = mode === 'register';
-  openSheet(`<h2>${reg ? 'Create your account' : 'Welcome back'}</h2><p>${esc(why || (reg ? 'Use your student email.' : 'Log in to continue.'))}</p>
+  closeSheet();
+  $('gate').innerHTML = `<div class="gwrap"><div class="logo"><div class="mark"><svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><div><b>Campus Find</b><small>Lost and found for students</small></div></div><div class="gcard"><h2>${reg ? 'Create your account' : 'Welcome back'}</h2><p>${esc(why || (reg ? 'Use your student email.' : 'Log in to continue.'))}</p>
     ${reg ? '<input class="field" id="aname" placeholder="Full name"><input class="field" id="aphone" type="tel" placeholder="Phone, e.g. 024 123 4567">' : ''}
     <input class="field" id="aemail" type="email" placeholder="Student email" autocomplete="email">
     <div class="pw"><input class="field" id="apass" type="password" placeholder="Password (8+ characters)" autocomplete="${reg ? 'new-password' : 'current-password'}"><button type="button" class="eye" data-act="eye">Show</button></div>
     <button class="btn" data-act="authgo">${reg ? 'Create account' : 'Log in'}</button>
     <button class="btn alt" data-act="authswap">${reg ? 'I already have an account' : 'New here? Register'}</button>
-    ${reg ? '' : '<div style="text-align:center"><button class="link" data-act="forgot">Forgot password?</button></div>'}`);
+    ${reg ? '' : '<div style="text-align:center"><button class="link" data-act="forgot">Forgot password?</button></div>'}</div><div class="gfoot">Only registered students can browse and post.</div></div>`;
+  $('gate').classList.remove('hidden');
 }
 async function authGo(btn) {
+  if (token) return toast('Log out first to use a different account', true);
   btn.disabled = true;
   try {
     const reg = authMode === 'register';
     const d = await api(reg ? '/api/auth/register' : '/api/auth/login', 'POST', { full_name: $('aname')?.value, student_email: $('aemail').value, phone: $('aphone')?.value, password: $('apass').value });
     token = d.token; user = d.user; localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
-    closeSheet(); toast('Welcome, ' + user.full_name.split(' ')[0]); go(tab === 'account' ? 'account' : tab);
+    $('gate').classList.add('hidden'); applyAuthState(); toast('Welcome, ' + user.full_name.split(' ')[0]); go('browse');
   } catch (e) { toast(e.message, true); btn.disabled = false; }
 }
-function logout(silent) {
+function applyAuthState() { document.body.classList.toggle('authed', !!token); }
+function endSession(msg) {
   token = null; user = null; localStorage.removeItem('token'); localStorage.removeItem('user');
-  if (!silent) toast('Logged out'); go(tab === 'claims' || tab === 'report' ? 'browse' : tab);
+  tab = 'browse'; filt = { type:'', category:'', q:'' }; $('q').value = '';
+  applyAuthState(); authSheet('login', msg);
 }
+function logout() { endSession('You have been logged out.'); }
 
 // ---------- my posts ----------
 const STATUS = { OPEN:'Open', CLAIM_PENDING:'Claim pending', VERIFIED:'Verified', RETURNED:'Returned' };
@@ -387,7 +403,7 @@ function delSheet() {
 async function delGo(btn) {
   const password = $('dpass').value; if (!password) return toast('Enter your password to confirm', true);
   btn.disabled = true;
-  try { await api('/api/account', 'DELETE', { password }); closeSheet(); logout(true); toast('Account deleted'); }
+  try { await api('/api/account', 'DELETE', { password }); closeSheet(); endSession('Your account was deleted. You can register again anytime.'); }
   catch (e) { toast(e.message, true); btn.disabled = false; }
 }
 
@@ -433,7 +449,8 @@ document.addEventListener('click', e => {
   else if (act === 'hide' || act === 'unhide' || act === 'adel') adminAct(act, id);
 });
 
-go('browse');
+applyAuthState();
+if (token) go('browse'); else authSheet('login', 'Log in with your student account to continue.');
 </script>
 </body>
 </html>
