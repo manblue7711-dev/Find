@@ -127,6 +127,24 @@ app.post('/api/auth/register/start', strict, wrap(async (req, res) => {
     return res.status(409).json({ error: 'Email already registered' });
   if (await phoneTaken(phone))
     return res.status(409).json({ error: 'That phone number is already registered to another account' });
+  // TEMPORARY SWITCH: with REQUIRE_PHONE_VERIFY=false on Render, sign-up skips the SMS code
+  // (use while the Arkesel sender ID is pending). Remove the variable to turn verification back on.
+  if (process.env.REQUIRE_PHONE_VERIFY === 'false') {
+    try {
+      const r = await pool.query(
+        `INSERT INTO users (full_name, student_email, phone, password_hash) VALUES ($1,$2,$3,$4)
+         RETURNING id, full_name, role, token_version`,
+        [name, email, String(phone).trim(), await bcrypt.hash(password, 10)]);
+      const u = r.rows[0];
+      return res.json({
+        token: jwt.sign({ id: u.id, role: u.role, tv: u.token_version || 0 }, JWT_SECRET, { expiresIn: '30d' }),
+        user: { id: u.id, full_name: u.full_name, role: u.role },
+      });
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+      throw e;
+    }
+  }
   const recent = (await pool.query(
     "SELECT 1 FROM pending_registrations WHERE student_email=$1 AND created_at > now() - interval '60 seconds'", [email])).rows[0];
   if (recent) return res.status(429).json({ error: 'Wait a minute before asking for another code' });
