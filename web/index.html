@@ -396,7 +396,8 @@ async function authGo(btn) {
   try {
     if (authMode === 'register') {
       regForm = { full_name: $('aname').value, student_email: $('aemail').value, phone: $('aphone').value, password: $('apass').value };
-      await api('/api/auth/register/start', 'POST', regForm);
+      const d = await api('/api/auth/register/start', 'POST', regForm);
+      if (d.token) { regForm = null; return finishLogin(d); } // verification switched off on the server
       return regVerifyScreen();
     }
     finishLogin(await api('/api/auth/login', 'POST', { student_email: $('aemail').value, password: $('apass').value }));
