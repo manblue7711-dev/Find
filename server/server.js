@@ -40,13 +40,21 @@ function maskId(id) {
   return s.length <= 4 ? '****' : s.slice(0, 2) + '*'.repeat(s.length - 4) + s.slice(-2);
 }
 
-function auth(req, res, next) {
-  const h = req.headers.authorization || '';
+// Checks the token AND that its version still matches the user's, so
+// "sign out of all devices" and password changes cancel old sessions.
+async function auth(req, res, next) {
+  let payload;
+  try { payload = jwt.verify((req.headers.authorization || '').replace('Bearer ', ''), JWT_SECRET); }
+  catch { return res.status(401).json({ error: 'Login required' }); }
   try {
-    req.user = jwt.verify(h.replace('Bearer ', ''), JWT_SECRET);
+    const r = await pool.query('SELECT token_version FROM users WHERE id=$1', [payload.id]);
+    if (!r.rows[0] || r.rows[0].token_version !== (payload.tv || 0))
+      return res.status(401).json({ error: 'Session ended. Log in again.' });
+    req.user = payload;
     next();
-  } catch {
-    res.status(401).json({ error: 'Login required' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Server error' });
   }
 }
 
@@ -105,7 +113,7 @@ app.post('/api/auth/register', strict, wrap(async (req, res) => {
        VALUES ($1,$2,$3,$4) RETURNING id, full_name, role`,
       [full_name.trim(), norm(student_email), phone.trim(), hash]);
     const u = r.rows[0];
-    res.json({ token: jwt.sign({ id: u.id, role: u.role }, JWT_SECRET, { expiresIn: '7d' }), user: u });
+    res.json({ token: jwt.sign({ id: u.id, role: u.role, tv: u.token_version || 0 }, JWT_SECRET, { expiresIn: '30d' }), user: u });
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
     throw e;
@@ -119,7 +127,7 @@ app.post('/api/auth/login', strict, wrap(async (req, res) => {
   if (!u || !(await bcrypt.compare(password || '', u.password_hash)))
     return res.status(401).json({ error: 'Wrong email or password' });
   res.json({
-    token: jwt.sign({ id: u.id, role: u.role }, JWT_SECRET, { expiresIn: '7d' }),
+    token: jwt.sign({ id: u.id, role: u.role, tv: u.token_version || 0 }, JWT_SECRET, { expiresIn: '30d' }),
     user: { id: u.id, full_name: u.full_name, role: u.role },
   });
 }));
@@ -311,7 +319,7 @@ app.post('/api/auth/reset', strict, wrap(async (req, res) => {
     await pool.query('UPDATE password_resets SET attempts=attempts+1 WHERE id=$1', [row.id]);
     return res.status(400).json({ error: 'Wrong code' });
   }
-  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(new_password, 10), row.user_id]);
+  await pool.query('UPDATE users SET password_hash=$1, token_version=token_version+1 WHERE id=$2', [await bcrypt.hash(new_password, 10), row.user_id]);
   await pool.query('DELETE FROM password_resets WHERE user_id=$1', [row.user_id]);
   res.json({ message: 'Password updated. Log in with your new password.' });
 }));
@@ -321,8 +329,14 @@ app.post('/api/account/password', auth, strict, wrap(async (req, res) => {
   if (!u || !(await bcrypt.compare(String(req.body.current_password || ''), u.password_hash)))
     return res.status(403).json({ error: 'Current password is wrong' });
   if (!validPw(req.body.new_password)) return res.status(400).json({ error: 'New password must be 8+ characters' });
-  await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await bcrypt.hash(req.body.new_password, 10), req.user.id]);
-  res.json({ message: 'Password changed' });
+  const upd = await pool.query(
+    'UPDATE users SET password_hash=$1, token_version=token_version+1 WHERE id=$2 RETURNING token_version, role',
+    [await bcrypt.hash(req.body.new_password, 10), req.user.id]);
+  // Other devices are signed out; this device gets a fresh token so it stays signed in.
+  res.json({
+    message: 'Password changed. Other devices were signed out.',
+    token: jwt.sign({ id: req.user.id, role: upd.rows[0].role, tv: upd.rows[0].token_version }, JWT_SECRET, { expiresIn: '30d' }),
+  });
 }));
 
 // ---------- admin (role checked in the database, not the token) ----------
@@ -348,6 +362,41 @@ app.patch('/api/admin/items/:id/hide', auth, admin, wrap(async (req, res) => {
 app.delete('/api/admin/items/:id', auth, admin, wrap(async (req, res) => {
   await pool.query('DELETE FROM items WHERE id=$1', [req.params.id]);
   res.json({ message: 'Deleted' });
+}));
+
+// ---------- profile ----------
+app.get('/api/account', auth, wrap(async (req, res) => {
+  const r = await pool.query(
+    'SELECT id, full_name, student_email, phone, role, created_at FROM users WHERE id=$1', [req.user.id]);
+  if (!r.rows[0]) return res.status(401).json({ error: 'Login required' });
+  res.json(r.rows[0]);
+}));
+
+app.patch('/api/account', auth, wrap(async (req, res) => {
+  const name = String(req.body.full_name || '').trim().slice(0, 100);
+  const phone = String(req.body.phone || '').trim();
+  if (name.length < 2 || !ghPhone(phone))
+    return res.status(400).json({ error: 'Enter your full name and a valid phone, e.g. 024 123 4567' });
+  await pool.query('UPDATE users SET full_name=$1, phone=$2 WHERE id=$3', [name, phone, req.user.id]);
+  res.json({ full_name: name, phone });
+}));
+
+// Everything stored about the user, for the "Download my data" button.
+app.get('/api/account/export', auth, wrap(async (req, res) => {
+  const profile = (await pool.query(
+    'SELECT full_name, student_email, phone, role, created_at FROM users WHERE id=$1', [req.user.id])).rows[0];
+  const items = (await pool.query(
+    `SELECT type, category, title, description, masked_identifier, location, handoff_zone, status, created_at
+     FROM items WHERE posted_by=$1 ORDER BY created_at DESC`, [req.user.id])).rows;
+  const claims = (await pool.query(
+    'SELECT item_id, answer_matched, status, created_at FROM claims WHERE claimant_id=$1 ORDER BY created_at DESC',
+    [req.user.id])).rows;
+  res.json({ exported_at: new Date().toISOString(), profile, items, claims });
+}));
+
+app.post('/api/account/logout-all', auth, wrap(async (req, res) => {
+  await pool.query('UPDATE users SET token_version=token_version+1 WHERE id=$1', [req.user.id]);
+  res.json({ message: 'Signed out of all devices' });
 }));
 
 // Permanently deletes the account, its items and its claims, freeing the email to register again.
