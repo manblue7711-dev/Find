@@ -116,9 +116,9 @@ nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);co
 
 <script>
 // ---- SETTINGS: fill these three in ----
-const API = 'https://campusfind-uid7.onrender.com';
-const CLOUD_NAME = 'deadrpp5';
-const UPLOAD_PRESET = 'ca4ry12f';
+const API = 'https://YOUR-RENDER-APP.onrender.com';
+const CLOUD_NAME = 'YOUR_CLOUD_NAME';
+const UPLOAD_PRESET = 'YOUR_UNSIGNED_PRESET';
 // ---------------------------------------
 
 const CATS = { ID_CARD:'ID card', PHONE:'Phone', CARD:'Bank card', BAG:'Bag', KEYS:'Keys', OTHER:'Other' };
@@ -237,7 +237,7 @@ function viewReport() {
   <div class="seg"><button class="${!lost ? 'on' : ''}" data-act="kind" data-v="FOUND">I found something</button><button class="${lost ? 'on' : ''}" data-act="kind" data-v="LOST">I lost something</button></div>
   <label class="l">Category</label>
   <div class="chips" style="padding:0 0 10px">${Object.entries(CATS).map(([v, l]) => `<button class="chip ${rCat === v ? 'on' : ''}" data-act="rcat" data-v="${v}">${l}</button>`).join('')}</div>
-  <label class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo<br><small>Hide any ID numbers if you can</small></span><input id="pimg" type="file" accept="image/*" hidden></label>
+  <label class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo ${lost ? '(optional)' : '(required)'}<br><small>Hide any ID numbers if you can</small></span><input id="pimg" type="file" accept="image/*" hidden></label>
   <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
   <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
   <input class="field" id="pid" placeholder="ID number (optional)"><div class="hint">Shown to others with the end hidden, like PS/CSC/22/****</div>
@@ -253,6 +253,7 @@ function viewReport() {
 }
 async function postItem(btn) {
   const file = $('photoBox')._file || $('pimg')?.files?.[0];
+  if (!file && rKind === 'FOUND') return toast('Add a photo of the item you found', true);
   btn.disabled = true; btn.textContent = file ? 'Uploading photo…' : 'Posting…';
   try {
     const image_url = file ? await uploadImage(file) : null;
@@ -434,14 +435,25 @@ async function viewMine() {
   $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">My posts</h2><div id="ml"><div class="sk" style="height:110px"></div></div>`;
   try {
     const m = await api('/api/my/items');
-    $('ml').innerHTML = m.length ? m.map(x => `<div class="card"><div class="body">
+    $('ml').innerHTML = m.length ? m.map(x => `<div class="card">${x.image_url ? `<div class="media"><img src="${esc(x.image_url)}" alt="" loading="lazy"></div>` : ''}<div class="body">
       <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${CATS[x.category] || ''}</span><span class="pill">${STATUS[x.status]}</span></div>
       <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</div>
       ${x.pending_claims ? `<div class="meta" style="color:var(--found);font-weight:600">${x.pending_claims} claim waiting</div><button class="btn sm" data-tab="claims">Review claims</button>` : ''}
+      ${x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="addphoto" data-id="${x.id}">${x.image_url ? 'Change photo' : 'Add photo'}</button>` : ''}
       ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">I found it</button>` : ''}
       ${x.type === 'FOUND' && x.status === 'VERIFIED' ? '<div class="meta">Waiting for the owner to confirm they received it.</div>' : ''}</div></div>`).join('')
       : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
   } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
+}
+function pickPhoto(id) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    toast('Uploading photo…');
+    try { const url = await uploadImage(f); await api(`/api/items/${id}/photo`, 'PATCH', { image_url: url }); toast('Photo saved'); viewMine(); }
+    catch (e) { toast(e.message, true); }
+  };
+  inp.click();
 }
 async function markReturned(id) { try { await api(`/api/items/${id}/resolve`, 'PATCH'); toast('Marked as returned'); viewMine(); } catch (e) { toast(e.message, true); } }
 
@@ -553,6 +565,7 @@ document.addEventListener('click', e => {
   else if (act === 'regverify') regVerify(t);
   else if (act === 'regresend') regResend(t);
   else if (act === 'regback') authSheet('register');
+  else if (act === 'addphoto') pickPhoto(id);
   else if (act === 'gotit') gotItSheet(id);
   else if (act === 'gotitgo') gotItGo(id, t);
   else if (act === 'privacy') viewPrivacy();
