@@ -59,6 +59,7 @@ body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);c
 .ititle{font-weight:700;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .imeta{color:var(--mute);font-size:13px;display:flex;align-items:center;gap:5px;min-width:0}
 .imeta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imeta.wrap span{white-space:normal}
 .iact{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px}
 .iright{display:flex;align-items:center;gap:2px;margin-left:auto}
 .pbtn{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:14px;font-weight:600;background:var(--primary);color:var(--on);cursor:pointer;white-space:nowrap}
@@ -66,6 +67,27 @@ body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);c
 .stat.mine{background:var(--foundbg);color:var(--found)}
 .kebab{border:0;background:none;color:var(--mute);font-size:22px;line-height:1;padding:2px 8px;cursor:pointer}
 .sk.row{height:114px;border-radius:12px;margin-bottom:10px}
+.bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;background:var(--header);color:#fff;border-bottom:4px solid var(--gold);padding:calc(10px + env(safe-area-inset-top)) 14px 10px;min-height:58px}
+.bar h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.2px}
+.back{flex:none;border:0;background:rgba(255,255,255,.16);color:#fff;width:36px;height:36px;border-radius:50%;font-size:26px;line-height:1;padding:0 0 3px;cursor:pointer}
+.sect{font-size:12px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.6px;margin:4px 2px 10px}
+.iacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.pbtn.alt{background:var(--chip);color:var(--ink)}
+.pbtn.danger{background:var(--lostbg);color:var(--lost)}
+.fcard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.fcard h3{margin:0 0 10px;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.6px;font-weight:700}
+.fcard .field:last-child{margin-bottom:0}
+.chips.wrap{flex-wrap:wrap;overflow:visible;padding:0}
+.photorow{display:flex;gap:12px;align-items:center}
+.photo.sm{width:104px;height:104px;min-height:0;flex:none;margin:0;border-radius:12px}
+.photo.sm img{width:100%;height:100%;max-height:none;object-fit:cover}
+.pbtns{flex:1;display:grid;gap:8px}.pbtns .btn{margin:0;padding:11px}
+.hero{display:flex;align-items:center;gap:14px;background:var(--header);color:#fff;border-radius:14px;border-bottom:4px solid var(--gold);padding:16px;margin-bottom:12px}
+.hero .av{width:54px;height:54px;font-size:22px;background:var(--gold);color:#14143A}
+.hero b{font-size:18px;display:block}.hero small{opacity:.8;word-break:break-all}
+.menu{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.mrow{display:flex;align-items:center;gap:12px;width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;font-weight:600;padding:14px;text-align:left;cursor:pointer}
+.mrow:last-child{border-bottom:0}.mrow svg{color:var(--primary);flex:none}.mrow .chev{margin-left:auto;color:var(--mute);font-size:20px;line-height:1}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 2px rgba(46,45,136,.06)}
 .media{aspect-ratio:2.4/1;max-height:150px;background:var(--chip);display:grid;place-items:center;color:var(--mute);position:relative}
 .media img{width:100%;height:100%;object-fit:cover;display:block}
@@ -120,6 +142,7 @@ nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);co
     <label class="search"><svg id="ic-search" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search phone, ID, library…" enterkeyhint="search"></label>
     <div id="filters"><div class="chips" id="typeChips"></div></div>
   </div>
+  <div class="bar hidden" id="bar"><button class="back hidden" id="barBack" data-tab="account" aria-label="Back">&#8249;</button><h1 id="barTitle"></h1></div>
   <div class="page" id="app"></div>
 </div>
 
@@ -187,11 +210,13 @@ async function uploadImage(file) {
 }
 
 // ---------- navigation ----------
+function setBar(title, back) { $('bar').classList.remove('hidden'); $('barTitle').textContent = title; $('barBack').classList.toggle('hidden', !back); }
 function go(t) {
   if ((t === 'report' || t === 'claims') && !token) { tab = t; return authSheet('login', 'Log in to ' + (t === 'report' ? 'report an item' : 'see your claims')); }
   tab = t;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   $('top').classList.toggle('hidden', t !== 'browse'); $('filters').classList.toggle('hidden', t !== 'browse');
+  $('bar').classList.add('hidden');
   ({ browse: viewBrowse, report: viewReport, claims: viewClaims, account: viewAccount })[t]();
   window.scrollTo(0, 0);
 }
@@ -255,22 +280,26 @@ async function contactSheet(id) {
 // ---------- report ----------
 function viewReport() {
   const lost = rKind === 'LOST';
-  $('app').innerHTML = `<h2 style="margin:0 0 12px">Report an item</h2>
+  setBar('Report an item');
+  $('app').innerHTML = `
   <div class="seg"><button class="${!lost ? 'on' : ''}" data-act="kind" data-v="FOUND">I found something</button><button class="${lost ? 'on' : ''}" data-act="kind" data-v="LOST">I lost something</button></div>
-  <label class="l">Category</label>
-  <div class="chips" style="padding:0 0 10px">${Object.entries(CATS).map(([v, l]) => `<button class="chip ${rCat === v ? 'on' : ''}" data-act="rcat" data-v="${v}">${l}</button>`).join('')}</div>
-  <div class="photo" id="photoBox"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Add a photo ${lost ? '(optional)' : '(required)'}<br><small>Show the item clearly. Cover any ID numbers.</small></span></div>
-  <div class="row" style="margin-bottom:10px"><button class="btn alt" data-act="cam" style="margin:0">Take photo</button><button class="btn alt" data-act="gal" style="margin:0">From gallery</button></div>
-  <input id="pcam" type="file" accept="image/*" capture="environment" hidden><input id="pgal" type="file" accept="image/*" hidden>
-  <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
-  <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
-  <input class="field" id="pid" placeholder="${lost ? 'Full ID number (required for ID cards)' : 'ID number (optional)'}"><div class="hint">${lost ? 'Kept private. Finders must type it to prove they hold your card.' : 'Shown to others with the end hidden, like PS/CSC/22/****'}</div>
-  <input class="field" id="ploc" placeholder="${lost ? 'Where did you lose it?' : 'Where did you find it?'}">
-  <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select>
-  ${lost
-    ? `<label class="l">Secret detail only you know (required)</label><input class="field" id="pq" placeholder="e.g. What sticker is on the back?"><input class="field" id="pa" placeholder="The answer (a finder must get it right)"><div class="hint">A finder has to answer this and send a live proof photo before you see their contact.</div>`
-    : `<label class="l">Secret question for the owner (required)</label><input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)">`}
-  <button class="btn" data-act="post" id="postBtn">Post ${lost ? 'lost item' : 'found item'}</button>`;
+  <section class="fcard"><h3>Category</h3><div class="chips wrap">${Object.entries(CATS).map(([v, l]) => `<button class="chip ${rCat === v ? 'on' : ''}" data-act="rcat" data-v="${v}">${l}</button>`).join('')}</div></section>
+  <section class="fcard"><h3>Photo ${lost ? '(optional)' : '(required)'}</h3>
+    <div class="photorow"><div class="photo sm" id="photoBox"><svg width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+      <div class="pbtns"><button class="btn alt" data-act="cam">Take photo</button><button class="btn alt" data-act="gal">From gallery</button></div></div>
+    <div class="hint" style="margin:10px 0 0">Show the item clearly. Cover any ID numbers.</div>
+    <input id="pcam" type="file" accept="image/*" capture="environment" hidden><input id="pgal" type="file" accept="image/*" hidden></section>
+  <section class="fcard"><h3>About the item</h3>
+    <input class="field" id="ptitle" placeholder="What is it? e.g. Black Tecno phone">
+    <input class="field" id="pdesc" placeholder="Details (colour, case, stickers)">
+    <input class="field" id="pid" placeholder="${lost ? 'Full ID number (required for ID cards)' : 'ID number (optional)'}"><div class="hint">${lost ? 'Kept private. Finders must type it to prove they hold your card.' : 'Shown to others with the end hidden, like PS/CSC/22/****'}</div>
+    <input class="field" id="ploc" placeholder="${lost ? 'Where did you lose it?' : 'Where did you find it?'}">
+    <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select></section>
+  <section class="fcard"><h3>${lost ? 'Secret detail (required)' : 'Secret question (required)'}</h3>
+    ${lost
+      ? `<input class="field" id="pq" placeholder="e.g. What sticker is on the back?"><input class="field" id="pa" placeholder="The answer (a finder must get it right)"><div class="hint">A finder must answer this and send a live proof photo before you see their contact.</div>`
+      : `<input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)"><div class="hint">The owner must answer this to claim the item.</div>`}</section>
+  <button class="btn" data-act="post" id="postBtn" style="margin-top:0">Post ${lost ? 'lost item' : 'found item'}</button>`;
   ['pcam', 'pgal'].forEach(id => { $(id).onchange = () => { const f = $(id).files[0]; if (f) { photoFile = f; showPhoto(); } $(id).value = ''; }; });
   if (photoFile) showPhoto();
 }
@@ -291,26 +320,30 @@ async function postItem(btn) {
 }
 
 // ---------- claims (finder) ----------
+const thumbHtml = (url, cat) => `<div class="thumb"${url ? ` data-act="zoom" data-src="${esc(url)}" style="cursor:zoom-in"` : ''}>${url ? `<img src="${esc(url)}" alt="" loading="lazy">` : (CAT_ICON[cat] || CAT_ICON.OTHER)}</div>`;
+const kindTag = (t) => `<span class="kind ${esc(t)}">${t === 'FOUND' ? 'Found' : 'Lost'}</span>`;
+const emptyBox = (title, text, extra = '') => `<div class="empty">${boxIcon}<b>${title}</b>${text}${extra}</div>`;
 async function viewClaims() {
-  $('app').innerHTML = `<h2 style="margin:0 0 12px">Claims on your items</h2><div id="cl"><div class="sk" style="height:110px"></div></div>
-    <h2 style="margin:22px 0 12px">Items you claimed</h2><div id="cd"><div class="sk" style="height:110px"></div></div>`;
+  setBar('Claims');
+  $('app').innerHTML = `<div class="sect">Waiting for your review</div><div id="cl"><div class="sk row"></div></div>
+    <div class="sect" style="margin-top:18px">Items you claimed</div><div id="cd"><div class="sk row"></div></div>`;
   api('/api/my/claims').then(c => {
-    $('cl').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
-      ${x.proof_url ? `<img src="${esc(x.proof_url)}" alt="" data-act="zoom" data-src="${esc(x.proof_url)}" style="width:100%;max-height:170px;object-fit:cover;border-radius:10px;margin:6px 0;cursor:zoom-in">` : ''}
-      <div class="meta">${x.item_type === 'LOST'
-        ? esc(x.claimant) + ' says they found your item. They answered your secret question correctly' + (x.id_matched ? ' and typed the right ID number' : '') + '. Check their proof photo (it must show the item and their code). '
-        : esc(x.claimant) + ' answered your question correctly. '}${ago(x.created_at)}</div>
-      <button class="btn sm" data-act="approve" data-id="${x.id}">Approve</button><button class="btn sm alt" data-act="reject" data-id="${x.id}">Reject</button></div></div>`).join('')
-      : `<div class="empty"><b>No claims waiting</b>When an owner answers your secret question correctly, it shows up here.</div>`;
-  }).catch(e => { $('cl').innerHTML = `<div class="empty"><b>Can't load claims</b>${esc(e.message)}</div>`; });
+    $('cl').innerHTML = (c.some(x => x.item_type === 'LOST') ? '<div class="hint" style="margin:0 2px 10px">Tap a photo to enlarge it. A real proof shows your item next to a handwritten code.</div>' : '') + (c.length ? c.map(x => `<article class="item">${thumbHtml(x.proof_url, 'OTHER')}
+      <div class="ibody"><div class="irow">${kindTag(x.item_type)}<span class="when">${ago(x.created_at)}</span></div>
+      <div class="ititle">${esc(x.title)}</div>
+      <div class="imeta wrap"><span>${esc(x.claimant)} ${x.item_type === 'LOST' ? 'says they have it' : 'answered correctly'}${x.id_matched ? ' · ID matched' : ''}</span></div>
+      <div class="iacts"><button class="pbtn" data-act="approve" data-id="${x.id}">Approve</button><button class="pbtn alt" data-act="reject" data-id="${x.id}">Reject</button></div></div></article>`).join('')
+      : emptyBox('No claims waiting', 'Answers and proof from other students show up here.'));
+  }).catch(e => { $('cl').innerHTML = emptyBox("Can't load claims", esc(e.message)); });
   api('/api/my/claimed').then(c => {
-    $('cd').innerHTML = c.length ? c.map(x => `<div class="card"><div class="body"><h3>${esc(x.title)}</h3>
-      <div class="meta">${x.type === 'LOST'
-        ? (x.claim_status === 'APPROVED' ? 'The owner approved your report. They will contact you to meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the owner to review your proof.')
-        : (x.claim_status === 'APPROVED' ? 'Approved. Meet at ' + esc(x.handoff_zone || 'a public spot on campus') + '.' : 'Waiting for the finder to approve.')}</div>
-      ${x.claim_status === 'APPROVED' && x.type !== 'LOST' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button><button class="btn sm alt" data-act="gotit" data-id="${x.id}">I received it</button>` : ''}</div></div>`).join('')
-      : `<div class="empty"><b>Nothing claimed yet</b>Found something that's yours? Tap "This is mine" in Browse.</div>`;
-  }).catch(e => { $('cd').innerHTML = `<div class="empty"><b>Can't load your claims</b>${esc(e.message)}</div>`; });
+    $('cd').innerHTML = c.length ? c.map(x => {
+      const ok = x.claim_status === 'APPROVED', spot = esc(x.handoff_zone || 'a public spot on campus');
+      return `<article class="item">${thumbHtml(null, 'OTHER')}<div class="ibody"><div class="irow">${kindTag(x.type)}<span class="stat">${ok ? 'Approved' : 'Pending'}</span></div>
+      <div class="ititle">${esc(x.title)}</div>
+      <div class="imeta"><span>${x.type === 'LOST' ? (ok ? 'Owner will contact you · ' + spot : 'Waiting for the owner') : (ok ? 'Meet at ' + spot : 'Waiting for the finder')}</span></div>
+      ${ok && x.type !== 'LOST' ? `<div class="iacts"><button class="pbtn" data-act="contact" data-id="${x.id}">Finder's contact</button><button class="pbtn alt" data-act="gotit" data-id="${x.id}">I received it</button></div>` : ''}</div></article>`;
+    }).join('') : emptyBox('Nothing claimed yet', 'Found something that\'s yours? Tap "This is mine" in Browse.');
+  }).catch(e => { $('cd').innerHTML = emptyBox("Can't load your claims", esc(e.message)); });
 }
 let proof = { id: null, code: '', file: null };
 async function foundItSheet(id) {
@@ -365,26 +398,31 @@ async function loadProfile() {
   localStorage.setItem('user', JSON.stringify(user));
   return profile;
 }
+const mi = (d) => `<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">${d}</svg>`;
+const mrow = (act, icon, label) => `<button class="mrow" data-act="${act}">${mi(icon)}<span>${label}</span><span class="chev">&#8250;</span></button>`;
 async function viewAccount() {
   acctView = 'account';
-  $('app').innerHTML = '<div class="sk" style="height:140px"></div>';
+  setBar('Account');
+  $('app').innerHTML = '<div class="sk" style="height:96px;border-radius:14px"></div>';
   try {
     const p = await loadProfile();
-    $('app').innerHTML = `<div class="who"><div class="av">${esc(p.full_name[0].toUpperCase())}</div><div style="min-width:0"><b>${esc(p.full_name)}</b><div class="meta" style="margin:0;word-break:break-all">${esc(p.student_email)}</div></div></div>
-    <div class="card"><div class="body">
-      ${prow('Full name', p.full_name)}${prow('Student email', p.student_email)}${prow('Phone', p.phone)}${prow('Member since', fmtDate(p.created_at))}${p.role === 'admin' ? prow('Role', 'Admin') : ''}
-      <button class="btn sm alt" data-act="editprof">Edit profile</button></div></div>
-    <button class="btn alt" data-act="mine" style="margin:0 0 10px">My posts</button>
-    <button class="btn alt" data-act="chpw" style="margin:0 0 10px">Change password</button>
-    <button class="btn alt" data-act="privacy" style="margin:0 0 10px">Privacy &amp; security</button>
-    ${p.role === 'admin' ? '<button class="btn alt" data-act="admin" style="margin:0 0 10px">Admin panel</button>' : ''}
-    <button class="btn danger" data-act="logout" style="margin:18px 0 0">Log out</button>`;
-  } catch (e) { $('app').innerHTML = `<div class="empty"><b>Can't load your profile</b>${esc(e.message)}<button class="btn alt" data-act="retryacct">Try again</button></div>`; }
+    $('app').innerHTML = `<div class="hero"><div class="av">${esc(p.full_name[0].toUpperCase())}</div><div style="min-width:0"><b>${esc(p.full_name)}</b><small>${esc(p.student_email)}</small></div></div>
+    <div class="fcard"><h3>Details</h3>${prow('Phone', p.phone)}${prow('Member since', fmtDate(p.created_at))}${p.role === 'admin' ? prow('Role', 'Admin') : ''}
+      <button class="pbtn alt" data-act="editprof" style="margin-top:12px">Edit profile</button></div>
+    <div class="menu">
+      ${mrow('mine', '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>', 'My posts')}
+      ${mrow('chpw', '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 'Change password')}
+      ${mrow('privacy', '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>', 'Privacy &amp; security')}
+      ${p.role === 'admin' ? mrow('admin', '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', 'Admin panel') : ''}
+    </div>
+    <button class="btn danger" data-act="logout" style="margin-top:0">Log out</button>`;
+  } catch (e) { $('app').innerHTML = emptyBox("Can't load your profile", esc(e.message), '<button class="btn alt" data-act="retryacct">Try again</button>'); }
 }
 async function viewPrivacy() {
   acctView = 'privacy';
   try { if (!profile) await loadProfile(); } catch (e) { return toast(e.message, true); }
-  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">Privacy &amp; security</h2>
+  setBar('Privacy & security', true);
+  $('app').innerHTML = `
   <div class="card"><div class="body"><h3>Your sign-in details</h3>
     ${prow('Email', profile.student_email)}${prow('Phone', profile.phone)}${prow('Password', '•••••••• (hidden)')}
     <div class="hint" style="margin:8px 0 0">Passwords are stored scrambled, so nobody can read yours, including us. You can set a new one any time.</div>
@@ -496,19 +534,24 @@ function logout() { endSession('You have been logged out.'); }
 const STATUS = { OPEN:'Open', CLAIM_PENDING:'Claim pending', VERIFIED:'Verified', RETURNED:'Returned' };
 const back = '<button class="link" data-tab="account" style="padding:0 0 10px">← Account</button>';
 async function viewMine() {
-  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">My posts</h2><div id="ml"><div class="sk" style="height:110px"></div></div>`;
+  setBar('My posts', true);
+  $('app').innerHTML = '<div id="ml"><div class="sk row"></div><div class="sk row"></div></div>';
   try {
     const m = await api('/api/my/items');
-    $('ml').innerHTML = m.length ? m.map(x => `<div class="card">${x.image_url ? `<div class="media"><img src="${esc(x.image_url)}" alt="" loading="lazy"></div>` : ''}<div class="body">
-      <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${CATS[x.category] || ''}</span><span class="pill">${STATUS[x.status]}</span></div>
-      <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</div>
-      ${x.pending_claims ? `<div class="meta" style="color:var(--found);font-weight:600">${x.pending_claims} claim waiting</div><button class="btn sm" data-tab="claims">Review claims</button>` : ''}
-      ${x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="addphoto" data-id="${x.id}">${x.image_url ? 'Change photo' : 'Add photo'}</button>` : ''}
-      ${x.type === 'LOST' && x.status === 'VERIFIED' ? `<button class="btn sm" data-act="contact" data-id="${x.id}">Get finder's contact</button>` : ''}
-      ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="btn sm alt" data-act="markret" data-id="${x.id}">${x.status === 'VERIFIED' ? 'I got it back' : 'I found it myself'}</button>` : ''}
-      ${x.type === 'FOUND' && x.status === 'VERIFIED' ? '<div class="meta">Waiting for the owner to confirm they received it.</div>' : ''}</div></div>`).join('')
-      : `<div class="empty">${boxIcon}<b>No posts yet</b>Items you report will show up here.<button class="btn" data-act="goreport">Report an item</button></div>`;
-  } catch (e) { $('ml').innerHTML = `<div class="empty"><b>Can't load your posts</b>${esc(e.message)}</div>`; }
+    $('ml').innerHTML = m.length ? m.map(x => `<article class="item">${thumbHtml(x.image_url, x.category)}<div class="ibody">
+      <div class="irow">${kindTag(x.type)}<span class="stat">${STATUS[x.status]}</span></div>
+      <div class="ititle">${esc(x.title)}</div>
+      <div class="imeta"><span>${esc(CATS[x.category] || '')} · ${ago(x.created_at)}${x.hidden ? ' · Hidden pending review' : ''}</span></div>
+      ${x.pending_claims ? `<div class="imeta" style="color:var(--found);font-weight:600"><span>${x.pending_claims} claim waiting</span></div>` : ''}
+      ${x.type === 'FOUND' && x.status === 'VERIFIED' ? '<div class="imeta"><span>Waiting for the owner to confirm</span></div>' : ''}
+      <div class="iacts">
+        ${x.pending_claims ? '<button class="pbtn" data-tab="claims">Review</button>' : ''}
+        ${x.type === 'LOST' && x.status === 'VERIFIED' ? `<button class="pbtn" data-act="contact" data-id="${x.id}">Finder's contact</button>` : ''}
+        ${x.status !== 'RETURNED' ? `<button class="pbtn alt" data-act="addphoto" data-id="${x.id}">${x.image_url ? 'Change photo' : 'Add photo'}</button>` : ''}
+        ${x.type === 'LOST' && x.status !== 'RETURNED' ? `<button class="pbtn alt" data-act="markret" data-id="${x.id}">${x.status === 'VERIFIED' ? 'I got it back' : 'Found it myself'}</button>` : ''}
+      </div></div></article>`).join('')
+      : emptyBox('No posts yet', 'Items you report will show up here.', '<button class="btn" data-act="goreport">Report an item</button>');
+  } catch (e) { $('ml').innerHTML = emptyBox("Can't load your posts", esc(e.message)); }
 }
 function photoSheet(id) {
   openSheet(`<h2>Add a photo</h2><p>Show the item clearly. We check that it matches your post.</p>
@@ -571,16 +614,17 @@ async function chpwGo(btn) {
 
 // ---------- admin ----------
 async function viewAdmin() {
-  $('app').innerHTML = `${back}<h2 style="margin:0 0 12px">Admin panel</h2><div id="al"><div class="sk" style="height:110px"></div></div>`;
+  setBar('Admin panel', true);
+  $('app').innerHTML = '<div id="al"><div class="sk row"></div></div>';
   try {
     const a = await api('/api/admin/items');
-    $('al').innerHTML = a.length ? a.map(x => `<div class="card"><div class="body">
-      <div class="row" style="justify-content:space-between"><span class="pill">${x.type === 'FOUND' ? 'Found' : 'Lost'} · ${STATUS[x.status]}</span><span class="pill" style="${x.reports ? 'color:var(--lost)' : ''}">${x.reports} report${x.reports === 1 ? '' : 's'}</span></div>
-      <h3 style="margin-top:6px">${esc(x.title)}</h3><div class="meta">By ${esc(x.poster)} · ${ago(x.created_at)}${x.hidden ? ' · Hidden' : ''}</div>
-      <button class="btn sm alt" data-act="${x.hidden ? 'unhide' : 'hide'}" data-id="${x.id}">${x.hidden ? 'Show again' : 'Hide'}</button>
-      <button class="btn sm danger" data-act="adel" data-id="${x.id}">Delete</button></div></div>`).join('')
-      : '<div class="empty"><b>No items</b></div>';
-  } catch (e) { $('al').innerHTML = `<div class="empty"><b>Can't open admin panel</b>${esc(e.message)}</div>`; }
+    $('al').innerHTML = a.length ? a.map(x => `<article class="item">${thumbHtml(null, 'OTHER')}<div class="ibody">
+      <div class="irow">${kindTag(x.type)}<span class="stat" style="${x.reports ? 'background:var(--lostbg);color:var(--lost)' : ''}">${x.reports} report${x.reports === 1 ? '' : 's'}</span></div>
+      <div class="ititle">${esc(x.title)}</div>
+      <div class="imeta"><span>${esc(x.poster)} · ${ago(x.created_at)} · ${STATUS[x.status]}${x.hidden ? ' · Hidden' : ''}</span></div>
+      <div class="iacts"><button class="pbtn alt" data-act="${x.hidden ? 'unhide' : 'hide'}" data-id="${x.id}">${x.hidden ? 'Show again' : 'Hide'}</button><button class="pbtn danger" data-act="adel" data-id="${x.id}">Delete</button></div></div></article>`).join('')
+      : emptyBox('No items', 'Nothing has been posted yet.');
+  } catch (e) { $('al').innerHTML = emptyBox("Can't open the admin panel", esc(e.message)); }
 }
 async function adminAct(act, id) {
   try {
