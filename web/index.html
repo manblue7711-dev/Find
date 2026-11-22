@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2E2D88">
+<meta name="theme-color" content="#1D2333">
 <title>Campus Find</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F4F5FB;--surface:#fff;--ink:#14143A;--mute:#5F6280;--line:#E0E1EE;--primary:#2E2D88;--on:#fff;--header:#2E2D88;--gold:#FDEE00;--found:#2E2D88;--foundbg:#E3E2F7;--lost:#C93A28;--lostbg:#FCE4E0;--chip:#ECEDF7;color-scheme:light}
 @media(prefers-color-scheme:dark){:root{--bg:#0E0D2B;--surface:#1A1946;--ink:#F0F0FB;--mute:#A4A6C8;--line:#2D2C66;--primary:#B4B3FF;--on:#14143A;--header:#1C1B5C;--found:#B9B8FF;--foundbg:#2A2970;--lost:#FF8A78;--lostbg:#3B1C18;--chip:#24235A;color-scheme:dark}}
@@ -30,7 +30,7 @@ body:not(.authed) #shell,body:not(.authed) nav{display:none}
 .gcard h2{margin:0 0 4px;font-size:20px}.gcard p{margin:0 0 14px;color:var(--mute)}
 .gfoot{text-align:center;color:var(--mute);font-size:12px;margin-top:14px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
+body{margin:0;font:14px/1.5 Poppins,system-ui,sans-serif;background:var(--bg);color:var(--ink)}
 #shell{max-width:520px;margin:0 auto;min-height:100dvh;padding-bottom:calc(92px + env(safe-area-inset-bottom))}
 .top{position:sticky;top:0;z-index:5;background:var(--header);color:#fff;border-bottom:4px solid var(--gold);padding:calc(12px + env(safe-area-inset-top)) 16px 12px}
 .brand{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
@@ -132,12 +132,49 @@ nav button.on{color:var(--primary)}
 .tips{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px;color:var(--mute);font-size:14px}
 .tips b{color:var(--ink)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== Arkesel-dashboard skin: dark navy, green accent, light grey-blue canvas, white cards ===== */
+:root{--bg:#E4EAEE;--surface:#fff;--ink:#1F2937;--mute:#6B7280;--line:#E3E8EC;--primary:#16B364;--on:#fff;--header:#1D2333;--navy:#1D2333;--green:#16B364;--gold:#16B364;--found:#0E9A56;--foundbg:#DDF5E8;--lost:#D14343;--lostbg:#FCE6E6;--chip:#EDF1F4;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0F1420;--surface:#1A2030;--ink:#EEF1F6;--mute:#9AA5B8;--line:#2A3246;--primary:#2BD17E;--on:#06210F;--header:#171C2B;--navy:#12161F;--green:#2BD17E;--gold:#2BD17E;--found:#4FE3A0;--foundbg:#12372A;--lost:#FF8A78;--lostbg:#3B1C18;--chip:#232B3E;color-scheme:dark}}
+body::before{display:none}
+.top,.bar{border-bottom:0}
+.upill{background:var(--green);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:8px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upill:empty{display:none}
+.top .chip.on{background:var(--green);color:#fff}
+.item,.card,.fcard,.menu,.gcard,.who,.tips{border:0;border-radius:10px;box-shadow:0 1px 3px rgba(16,24,40,.08)}
+.gcard{border-top:0}
+.hero{border-bottom:0;border-radius:10px}.hero .av{background:var(--green);color:#fff}
+.mark{border-bottom:0;background:var(--navy);color:var(--green)}
+.btn,.pbtn,.field,.seg,.seg button{border-radius:8px}
+.field{border:1px solid var(--line)}
+nav{background:var(--surface)}
+nav button.on{color:var(--green)}
+.navbrand{display:none}
+@media(min-width:900px){
+  #shell{max-width:none;margin-left:250px;padding-bottom:40px}
+  .page{max-width:900px;margin:0 auto;padding:24px}
+  .top,.bar{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.08);padding-left:24px;padding-right:24px}
+  .top .brand small,.top .chip{color:var(--mute)}
+  .brand small{color:var(--mute)}
+  .search{background:var(--chip);color:var(--mute)}
+  .search input{color:var(--ink)}
+  .top .chip{background:var(--chip)}
+  .top .chips{margin:0 -24px;padding:10px 24px 0}
+  .bar .back{background:var(--chip);color:var(--ink)}
+  nav{top:0;bottom:0;left:0;transform:none;width:250px;max-width:none;display:flex;flex-direction:column;gap:4px;background:var(--navy);border-top:0;padding:18px 12px}
+  .navbrand{display:flex;align-items:center;gap:12px;color:#fff;font-size:18px;padding:6px 8px 22px}
+  .navbrand .mark{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.08)}
+  nav button{display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;font-size:14px;font-weight:500;color:#C5CDD9;padding:12px 14px;border-radius:8px}
+  nav button svg{color:var(--green)}
+  nav button.on{background:#fff;color:var(--navy)}
+  #toast{bottom:28px}
+}
 </style>
 </head>
 <body>
 <div id="shell">
   <div class="top" id="top">
-    <div class="brand"><div><h1>Campus Find</h1><small>Lost &amp; found for UCC students</small></div></div>
+    <div class="brand"><div><h1>Campus Find</h1><small>Lost &amp; found for UCC students</small></div><span class="upill" id="topUser"></span></div>
     <label class="search"><svg id="ic-search" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search phone, ID, library…" enterkeyhint="search"></label>
     <div id="filters"><div class="chips" id="typeChips"></div></div>
   </div>
@@ -146,6 +183,7 @@ nav button.on{color:var(--primary)}
 </div>
 
 <nav>
+  <div class="navbrand"><div class="mark"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div><b>Campus Find</b></div>
   <button data-tab="browse"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Browse</button>
   <button data-tab="report"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Report</button>
   <button data-tab="claims"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>Claims</button>
@@ -226,7 +264,7 @@ function renderChips() {
   $('typeChips').innerHTML = [['', 'All'], ['FOUND', 'Found'], ['LOST', 'Lost']].map(([v, l]) => chip('type', v, l, filt.type === v)).join('')
     + '<span class="sep"></span>' + Object.entries(CATS).map(([v, l]) => chip('cat', v, l, filt.category === v)).join('');
 }
-function viewBrowse() { renderChips(); $('app').innerHTML = '<div id="list"><div class="sk row"></div><div class="sk row"></div><div class="sk row"></div></div>'; loadFeed(); }
+function viewBrowse() { $('topUser').textContent = user ? user.full_name.split(' ')[0] : ''; renderChips(); $('app').innerHTML = '<div id="list"><div class="sk row"></div><div class="sk row"></div><div class="sk row"></div></div>'; loadFeed(); }
 async function loadFeed() {
   const p = new URLSearchParams(Object.entries(filt).filter(([, v]) => v));
   try { items = await api('/api/items?' + p); renderList(); }
