@@ -42,7 +42,30 @@ body{margin:0;font:15px/1.45 Figtree,system-ui,sans-serif;background:var(--bg);c
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:500;padding:7px 14px;border-radius:99px;cursor:pointer}
 .chip.on{background:var(--primary);color:var(--on);border-color:var(--primary)}
-.page{padding:14px 16px}
+.page{padding:12px 14px}
+.top .chips{padding:10px 16px 0;margin:0 -16px}
+.top .chip{background:rgba(255,255,255,.14);color:#fff;border:0;padding:7px 13px;font-size:14px}
+.top .chip.on{background:var(--gold);color:#14143A;font-weight:600}
+.sep{flex:none;width:1px;background:rgba(255,255,255,.3);margin:5px 2px}
+.count{font-size:13px;font-weight:600;color:var(--mute);margin:2px 2px 10px}
+.item{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(46,45,136,.06)}
+.thumb{width:92px;height:92px;border-radius:10px;background:var(--chip);color:var(--mute);display:grid;place-items:center;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.ibody{min-width:0;display:flex;flex-direction:column;gap:2px}
+.irow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.kind{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.kind.FOUND{background:var(--foundbg);color:var(--found)}.kind.LOST{background:var(--lostbg);color:var(--lost)}
+.when{font-size:12px;color:var(--mute)}
+.ititle{font-weight:700;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.imeta{color:var(--mute);font-size:13px;display:flex;align-items:center;gap:5px;min-width:0}
+.imeta span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iact{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:6px}
+.iright{display:flex;align-items:center;gap:2px;margin-left:auto}
+.pbtn{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:14px;font-weight:600;background:var(--primary);color:var(--on);cursor:pointer;white-space:nowrap}
+.stat{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;background:var(--chip);color:var(--mute)}
+.stat.mine{background:var(--foundbg);color:var(--found)}
+.kebab{border:0;background:none;color:var(--mute);font-size:22px;line-height:1;padding:2px 8px;cursor:pointer}
+.sk.row{height:114px;border-radius:12px;margin-bottom:10px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 2px rgba(46,45,136,.06)}
 .media{aspect-ratio:2.4/1;max-height:150px;background:var(--chip);display:grid;place-items:center;color:var(--mute);position:relative}
 .media img{width:100%;height:100%;object-fit:cover;display:block}
@@ -72,7 +95,7 @@ label.l{display:block;font-size:13px;font-weight:600;margin:6px 0 6px}
 nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:520px;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:6}
 nav button{border:0;background:none;color:var(--mute);font:inherit;font-size:11px;font-weight:600;display:grid;justify-items:center;gap:3px;padding:6px 0;cursor:pointer}
 nav button.on{color:var(--primary)}
-nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);color:#1B1B1B;display:grid;place-items:center;margin-top:-22px;box-shadow:0 4px 14px rgba(245,183,0,.45)}
+nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);color:#1B1B1B;display:grid;place-items:center;margin-top:-30px;box-shadow:0 4px 14px rgba(0,0,0,.22)}
 .veil{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:8;opacity:0;pointer-events:none;transition:opacity .2s}
 .veil.open{opacity:1;pointer-events:auto}
 .sheet{position:fixed;left:50%;bottom:0;width:100%;max-width:520px;transform:translate(-50%,100%);background:var(--surface);border-radius:22px 22px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom));z-index:9;transition:transform .25s ease;max-height:88dvh;overflow-y:auto}
@@ -95,10 +118,7 @@ nav .fab span{width:52px;height:52px;border-radius:50%;background:var(--gold);co
   <div class="top" id="top">
     <div class="brand"><div><h1>Campus Find</h1><small>Lost &amp; found for UCC students</small></div></div>
     <label class="search"><svg id="ic-search" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search phone, ID, library…" enterkeyhint="search"></label>
-  </div>
-  <div id="filters">
-    <div class="chips" id="typeChips"></div>
-    <div class="chips" id="catChips"></div>
+    <div id="filters"><div class="chips" id="typeChips"></div></div>
   </div>
   <div class="page" id="app"></div>
 </div>
@@ -178,33 +198,34 @@ function go(t) {
 
 // ---------- browse ----------
 function renderChips() {
-  const types = [['', 'All'], ['FOUND', 'Found'], ['LOST', 'Lost']];
-  $('typeChips').innerHTML = types.map(([v, l]) => `<button class="chip ${filt.type === v ? 'on' : ''}" data-act="type" data-v="${v}">${l}</button>`).join('');
-  $('catChips').innerHTML = [['', 'Any category'], ...Object.entries(CATS)].map(([v, l]) => `<button class="chip ${filt.category === v ? 'on' : ''}" data-act="cat" data-v="${v}">${l}</button>`).join('');
+  const chip = (act, v, l, on) => `<button class="chip ${on ? 'on' : ''}" data-act="${act}" data-v="${v}">${l}</button>`;
+  $('typeChips').innerHTML = [['', 'All'], ['FOUND', 'Found'], ['LOST', 'Lost']].map(([v, l]) => chip('type', v, l, filt.type === v)).join('')
+    + '<span class="sep"></span>' + Object.entries(CATS).map(([v, l]) => chip('cat', v, l, filt.category === v)).join('');
 }
-function viewBrowse() { renderChips(); $('app').innerHTML = '<div id="list"><div class="sk"></div><div class="sk"></div></div>'; loadFeed(); }
+function viewBrowse() { renderChips(); $('app').innerHTML = '<div id="list"><div class="sk row"></div><div class="sk row"></div><div class="sk row"></div></div>'; loadFeed(); }
 async function loadFeed() {
   const p = new URLSearchParams(Object.entries(filt).filter(([, v]) => v));
   try { items = await api('/api/items?' + p); renderList(); }
   catch (e) { $('list').innerHTML = `<div class="empty"><b>Can't load items</b>${esc(e.message)}<button class="btn alt" data-act="retry">Try again</button></div>`; }
 }
+const CAT_ICON = {ID_CARD:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.6-1.6 2-2 3-2s2.4.4 3 2M14 10h4M14 13h3"/></svg>',PHONE:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>',CARD:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19M6 15h4"/></svg>',BAG:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 8h14l1 12H4z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',KEYS:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2 2M14 9l2 2"/></svg>',OTHER:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>'};
 function renderList() {
   if (!items.length) { $('list').innerHTML = `<div class="empty">${boxIcon}<b>Nothing here yet</b>No items match. Be the first to report one.<button class="btn" data-act="goreport">Report an item</button></div>`; return; }
-  $('list').innerHTML = items.map(i => {
+  $('list').innerHTML = `<div class="count">${items.length} item${items.length === 1 ? '' : 's'}</div>` + items.map(i => {
     const st = i.status === 'CLAIM_PENDING' ? 'Claim pending' : i.status === 'VERIFIED' ? 'Verified' : '';
     let action = '';
-    if (i.mine) action = '<div class="meta" style="margin-top:10px"><b>Your post</b></div>';
-    else if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="claim" data-id="${i.id}">This is mine</button>`;
-    else if (i.type === 'LOST' && i.status === 'OPEN' && i.security_question) action = `<button class="btn" data-act="foundit" data-id="${i.id}">I found this</button>`;
-    return `<article class="card">
-      <div class="media">${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy" data-act="zoom" data-src="${esc(i.image_url)}" style="cursor:zoom-in">` : boxIcon}
-        <span class="badge ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span>${st ? `<span class="state">${st}</span>` : ''}</div>
-      <div class="body"><h3>${esc(i.title)}</h3>
+    if (i.mine) action = '<span class="stat mine">Your post</span>';
+    else if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="pbtn" data-act="claim" data-id="${i.id}">This is mine</button>`;
+    else if (i.type === 'LOST' && i.status === 'OPEN' && i.security_question) action = `<button class="pbtn" data-act="foundit" data-id="${i.id}">I found this</button>`;
+    return `<article class="item">
+      <div class="thumb"${i.image_url ? ` data-act="zoom" data-src="${esc(i.image_url)}" style="cursor:zoom-in"` : ''}>${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : (CAT_ICON[i.category] || CAT_ICON.OTHER)}</div>
+      <div class="ibody">
+        <div class="irow"><span class="kind ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span><span class="when">${ago(i.created_at)}</span></div>
+        <div class="ititle">${esc(i.title)}</div>
         ${i.masked_identifier ? `<div class="idline">${esc(i.masked_identifier)}</div>` : ''}
-        ${i.description ? `<div class="meta">${esc(i.description)}</div>` : ''}
-        <div class="meta">${pinIcon}${esc(i.location)} · ${ago(i.created_at)}</div>
-        ${i.handoff_zone ? `<div class="meta">Hand-off: ${esc(i.handoff_zone)}</div>` : ''}${action}
-        <div style="text-align:right"><button class="link" data-act="report" data-id="${i.id}">Report this post</button></div></div></article>`;
+        <div class="imeta">${pinIcon}<span>${esc(i.location)}</span></div>
+        <div class="iact">${st ? `<span class="stat">${st}</span>` : ''}<span class="iright">${action}<button class="kebab" data-act="report" data-id="${i.id}" aria-label="Report this post">&#8943;</button></span></div>
+      </div></article>`;
   }).join('');
 }
 $('q').addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => { filt.q = e.target.value.trim(); loadFeed(); }, 300); });
@@ -588,7 +609,7 @@ document.addEventListener('click', e => {
   const t = e.target.closest('[data-act]'); if (!t) return;
   const { act, id, v } = t.dataset;
   if (act === 'type') { filt.type = v; renderChips(); loadFeed(); }
-  else if (act === 'cat') { filt.category = v; renderChips(); loadFeed(); }
+  else if (act === 'cat') { filt.category = filt.category === v ? '' : v; renderChips(); loadFeed(); }
   else if (act === 'retry') loadFeed();
   else if (act === 'goreport') go('report');
   else if (act === 'claim') { if (!token) authSheet('login', 'Log in to claim this item'); else claimSheet(id); }
