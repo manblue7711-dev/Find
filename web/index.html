@@ -596,10 +596,9 @@ async function viewAccount() {
     const p = await loadProfile();
     $('app').innerHTML = `<div class="hero"><div class="av">${esc(p.full_name[0].toUpperCase())}</div><div style="min-width:0"><b>${esc(p.full_name)}</b><small>${esc(p.student_email)}</small></div></div>
     <div class="fcard"><h3>Details</h3>${prow('Phone', p.phone)}${prow('Member since', fmtDate(p.created_at))}${p.role === 'admin' ? prow('Role', 'Admin') : ''}
-      <button class="pbtn alt" data-act="editprof" style="margin-top:12px">Edit profile</button></div>
+      <div class="hint" style="margin:12px 0 0">To edit your details or change your password, open Privacy &amp; security.</div></div>
     <div class="menu">
       ${mrow('mine', '<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>', 'My posts')}
-      ${mrow('chpw', '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 'Change password')}
       ${mrow('privacy', '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>', 'Privacy &amp; security')}
       ${p.role === 'admin' ? mrow('admin', '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', 'Admin panel') : ''}
     </div>
@@ -641,6 +640,11 @@ async function saveProfile(btn) {
     profile = { ...profile, ...d }; user = { ...user, full_name: d.full_name }; localStorage.setItem('user', JSON.stringify(user));
     closeSheet(); toast('Profile updated'); acctView === 'privacy' ? viewPrivacy() : viewAccount();
   } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+function logoutSheet() {
+  openSheet(`<h2>Log out?</h2><p>You will need to log in again to browse, post or claim items.</p>
+    <button class="btn danger" data-act="logoutgo">Yes, log out</button>
+    <button class="btn alt" data-act="closesheet">Stay logged in</button>`);
 }
 function logoutAllSheet() {
   openSheet(`<h2>Sign out everywhere?</h2><p>Every phone or browser signed in to your account will be logged out, including this one.</p>
@@ -858,7 +862,8 @@ document.addEventListener('click', e => {
   else if (act === 'login') authSheet('login');
   else if (act === 'authgo') authGo(t);
   else if (act === 'authswap') authSheet(authMode === 'login' ? 'register' : 'login');
-  else if (act === 'logout') logout();
+  else if (act === 'logout') logoutSheet();
+  else if (act === 'logoutgo') { closeSheet(); logout(); }
   else if (act === 'eye') { const i = t.parentElement.querySelector('input'); const hid = i.type === 'password'; i.type = hid ? 'text' : 'password'; t.textContent = hid ? 'Hide' : 'Show'; }
   else if (act === 'delask') delSheet();
   else if (act === 'delgo') delGo(t);
