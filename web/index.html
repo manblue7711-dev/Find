@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1D2333">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Campus Find">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Campus Find</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -169,6 +175,36 @@ nav button.on{color:var(--green)}
   nav button.on{background:#fff;color:var(--navy)}
   #toast{bottom:28px}
 }
+
+/* ===== motion ===== */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes inR{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+@keyframes inL{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.enter-tab{animation:rise .22s cubic-bezier(.2,.8,.2,1) both}
+.enter-fwd{animation:inR .26s cubic-bezier(.2,.8,.2,1) both}
+.enter-back{animation:inL .26s cubic-bezier(.2,.8,.2,1) both}
+.item{animation:rise .3s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*35ms)}
+#gate:not(.hidden){animation:fade .25s ease both}
+.veil{transition:opacity .25s ease}
+.sheet{will-change:transform;visibility:hidden;transition:transform .32s cubic-bezier(.32,.72,0,1),visibility 0s linear .32s}
+.sheet.open{visibility:visible;transition-delay:0s}
+#toast{transition:opacity .22s ease,transform .26s cubic-bezier(.2,.8,.2,1)}
+.btn,.pbtn,.chip,.mrow,.seg button,.back,.kebab,nav button{transition:transform .12s ease,background-color .16s,color .16s,opacity .16s}
+.btn:active,.pbtn:active,.chip:active,.mrow:active,.seg button:active,.back:active{transform:scale(.97)}
+nav button svg{transition:transform .18s ease}
+nav button:active svg{transform:scale(.88)}
+nav button.on svg{transform:translateY(-1px) scale(1.1)}
+/* ===== feels like an installed app ===== */
+html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,.sheet,.prow,.ititle,.imeta{-webkit-user-select:text;user-select:text}
+button,a,.chip,.item,nav button{touch-action:manipulation}
+.field,.search input,select.field{font-size:16px}
+.qcard{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px}
+.qhead{display:flex;gap:10px;align-items:flex-start;font-weight:600;margin-bottom:8px;cursor:pointer}
+.qhead input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--primary)}
+.qcard .field{margin-bottom:6px}.qcard .link{padding:2px 0}.qcard .link:disabled{opacity:.5;text-decoration:none}
 </style>
 </head>
 <body>
@@ -178,7 +214,7 @@ nav button.on{color:var(--green)}
     <label class="search"><svg id="ic-search" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Search phone, ID, library…" enterkeyhint="search"></label>
     <div id="filters"><div class="chips" id="typeChips"></div></div>
   </div>
-  <div class="bar hidden" id="bar"><button class="back hidden" id="barBack" data-tab="account" aria-label="Back">&#8249;</button><h1 id="barTitle"></h1></div>
+  <div class="bar hidden" id="bar"><button class="back hidden" id="barBack" data-act="goback" aria-label="Back">&#8249;</button><h1 id="barTitle"></h1></div>
   <div class="page" id="app"></div>
 </div>
 
@@ -218,7 +254,7 @@ async function api(path, method = 'GET', body) {
     headers: { 'Content-Type':'application/json', ...(token ? { Authorization:'Bearer ' + token } : {}) },
     body: body ? JSON.stringify(body) : undefined });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) { if (r.status === 401 && token) endSession('Your session expired. Log in again.'); throw new Error(d.error || 'Something went wrong. Try again.'); }
+  if (!r.ok) { if (r.status === 401 && token) endSession('Your session expired. Log in again.'); const err = new Error(d.error || 'Something went wrong. Try again.'); err.data = d; throw err; }
   return d;
 }
 function toast(msg, bad) {
@@ -248,15 +284,40 @@ async function uploadImage(file) {
 
 // ---------- navigation ----------
 function setBar(title, back) { $('bar').classList.remove('hidden'); $('barTitle').textContent = title; $('barBack').classList.toggle('hidden', !back); }
-function go(t) {
-  if ((t === 'report' || t === 'claims') && !token) { tab = t; return authSheet('login', 'Log in to ' + (t === 'report' ? 'report an item' : 'see your claims')); }
-  tab = t;
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  $('top').classList.toggle('hidden', t !== 'browse'); $('filters').classList.toggle('hidden', t !== 'browse');
-  $('bar').classList.add('hidden');
-  ({ browse: viewBrowse, report: viewReport, claims: viewClaims, account: viewAccount })[t]();
-  window.scrollTo(0, 0);
+// ---------- navigation: every screen is a history entry, so the phone's Back button works ----------
+const VIEWS = { browse: () => viewBrowse(), report: () => viewReport(), claims: () => viewClaims(), account: () => viewAccount(), mine: () => viewMine(), privacy: () => viewPrivacy(), admin: () => viewAdmin() };
+const TAB_OF = { browse: 'browse', report: 'report', claims: 'claims', account: 'account', mine: 'account', privacy: 'account', admin: 'account' };
+const SUBPAGES = ['mine', 'privacy', 'admin'];
+let depth = 0, curState = { v: 'browse', d: 0 };
+function renderView(v, dir) {
+  tab = TAB_OF[v];
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  $('top').classList.toggle('hidden', v !== 'browse'); $('bar').classList.add('hidden');
+  const a = $('app'); a.classList.remove('enter-fwd', 'enter-back', 'enter-tab'); void a.offsetWidth;
+  a.classList.add(dir === 'back' ? 'enter-back' : SUBPAGES.includes(v) ? 'enter-fwd' : 'enter-tab');
+  VIEWS[v](); window.scrollTo(0, 0);
 }
+function nav(v, mode) {
+  if (!token) return;
+  if (mode === 'replace') { curState = { v, d: depth }; history.replaceState(curState, ''); }
+  else { if (v === curState.v) return; depth++; curState = { v, d: depth }; history.pushState(curState, ''); }
+  renderView(v, 'fwd');
+}
+function go(t) {
+  if (!token) return;
+  if (t === 'browse') {
+    if (depth > 0) { history.go(-depth); return; }       // unwind to the first screen
+    curState = { v: 'browse', d: 0 }; history.replaceState(curState, ''); return renderView('browse');
+  }
+  nav(t);
+}
+window.addEventListener('popstate', (e) => {
+  if ($('sheet').classList.contains('open')) { closeSheet(); history.pushState(curState, ''); return; } // Back closes an open sheet first
+  if (!token) return;
+  const st = e.state && e.state.v ? e.state : { v: 'browse', d: 0 };
+  const dir = st.d < depth ? 'back' : 'fwd';
+  depth = st.d || 0; curState = st; renderView(st.v, dir);
+});
 
 // ---------- browse ----------
 function renderChips() {
@@ -273,13 +334,13 @@ async function loadFeed() {
 const CAT_ICON = {ID_CARD:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.6-1.6 2-2 3-2s2.4.4 3 2M14 10h4M14 13h3"/></svg>',PHONE:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/></svg>',CARD:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 10h19M6 15h4"/></svg>',BAG:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M5 8h14l1 12H4z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',KEYS:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2 2M14 9l2 2"/></svg>',OTHER:'<svg width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>'};
 function renderList() {
   if (!items.length) { $('list').innerHTML = `<div class="empty">${boxIcon}<b>Nothing here yet</b>No items match. Be the first to report one.<button class="btn" data-act="goreport">Report an item</button></div>`; return; }
-  $('list').innerHTML = `<div class="count">${items.length} item${items.length === 1 ? '' : 's'}</div>` + items.map(i => {
+  $('list').innerHTML = `<div class="count">${items.length} item${items.length === 1 ? '' : 's'}</div>` + items.map((i, n) => {
     const st = i.status === 'CLAIM_PENDING' ? 'Claim pending' : i.status === 'VERIFIED' ? 'Verified' : '';
     let action = '';
     if (i.mine) action = '<span class="stat mine">Your post</span>';
-    else if (i.type === 'FOUND' && i.status === 'OPEN' && i.security_question) action = `<button class="pbtn" data-act="claim" data-id="${i.id}">This is mine</button>`;
+    else if (i.type === 'FOUND' && i.status === 'OPEN' && (i.security_question || i.qcount)) action = `<button class="pbtn" data-act="claim" data-id="${i.id}">This is mine</button>`;
     else if (i.type === 'LOST' && i.status === 'OPEN' && i.security_question) action = `<button class="pbtn" data-act="foundit" data-id="${i.id}">I found this</button>`;
-    return `<article class="item">
+    return `<article class="item" style="--i:${Math.min(n, 6)}">
       <div class="thumb"${i.image_url ? ` data-act="zoom" data-src="${esc(i.image_url)}" style="cursor:zoom-in"` : ''}>${i.image_url ? `<img src="${esc(i.image_url)}" alt="" loading="lazy">` : (CAT_ICON[i.category] || CAT_ICON.OTHER)}</div>
       <div class="ibody">
         <div class="irow"><span class="kind ${esc(i.type)}">${i.type === 'FOUND' ? 'Found' : 'Lost'}</span><span class="when">${ago(i.created_at)}</span></div>
@@ -293,16 +354,40 @@ function renderList() {
 $('q').addEventListener('input', e => { clearTimeout(timer); timer = setTimeout(() => { filt.q = e.target.value.trim(); loadFeed(); }, 300); });
 
 // ---------- claim flow ----------
-function claimSheet(id) {
+async function claimSheet(id) {
   const i = items.find(x => x.id == id); if (!i) return;
-  openSheet(`<h2>Prove it's yours</h2><p>The finder set this question. Answer it to claim "${esc(i.title)}".</p>
-    <label class="l">${esc(i.security_question)}</label><input class="field" id="ans" placeholder="Your answer" autocomplete="off">
-    <button class="btn" data-act="submitclaim" data-id="${id}">Submit answer</button>`);
+  try {
+    const d = await api(`/api/items/${id}/questions`);
+    if (d.locked) return lockedSheet(id);
+    const fields = d.mode === 'multi'
+      ? d.questions.map(q => `<label class="l">${esc(q.question)}</label><input class="field" data-qid="${q.id}" placeholder="Your answer" autocomplete="off">`).join('')
+      : `<label class="l">${esc(d.question)}</label><input class="field" data-qid="single" placeholder="Your answer" autocomplete="off">`;
+    openSheet(`<h2>Prove it's yours</h2><p>Answer ${d.mode === 'multi' ? 'these questions' : 'this question'} about "${esc(i.title)}". ${d.attempts_left} attempt${d.attempts_left === 1 ? '' : 's'} left.</p>${fields}
+      <button class="btn" data-act="submitclaim" data-id="${id}">Submit answers</button>`);
+  } catch (e) { toast(e.message, true); }
 }
 async function submitClaim(id, btn) {
-  const a = $('ans').value.trim(); if (!a) return toast('Type your answer first', true);
+  const inputs = [...document.querySelectorAll('#sheet [data-qid]')];
+  if (inputs.some(x => !x.value.trim())) return toast('Answer every question', true);
+  const body = inputs[0].dataset.qid === 'single' ? { answer: inputs[0].value } : { answers: Object.fromEntries(inputs.map(x => [x.dataset.qid, x.value])) };
+  btn.disabled = true; btn.textContent = 'Checking…';
+  try {
+    const d = await api(`/api/items/${id}/claim`, 'POST', body);
+    closeSheet(); toast(d.message); loadFeed(); contactSheet(id);
+  } catch (e) {
+    if (e.data && e.data.locked) return lockedSheet(id);
+    toast(e.message + (e.data && e.data.attempts_left != null ? ` ${e.data.attempts_left} attempt${e.data.attempts_left === 1 ? '' : 's'} left.` : ''), true);
+    btn.disabled = false; btn.textContent = 'Submit answers';
+  }
+}
+function lockedSheet(id) {
+  openSheet(`<h2>No attempts left</h2><p>You can try again in 24 hours. Or share your number so the finder can clarify by phone. The finder will see it. You won't see theirs unless they approve.</p>
+    <button class="btn" data-act="sharenum" data-id="${id}">Share my number with the finder</button>
+    <button class="btn alt" data-act="closesheet">Not now</button>`);
+}
+async function shareNum(id, btn) {
   btn.disabled = true;
-  try { const d = await api(`/api/items/${id}/claim`, 'POST', { answer: a }); closeSheet(); toast(d.message); loadFeed(); }
+  try { const d = await api(`/api/items/${id}/contact-request`, 'POST'); closeSheet(); toast(d.message); }
   catch (e) { toast(e.message, true); btn.disabled = false; }
 }
 async function contactSheet(id) {
@@ -332,27 +417,76 @@ function viewReport() {
     <input class="field" id="pid" placeholder="${lost ? 'Full ID number (required for ID cards)' : 'ID number (optional)'}"><div class="hint">${lost ? 'Kept private. Finders must type it to prove they hold your card.' : 'Shown to others with the end hidden, like PS/CSC/22/****'}</div>
     <input class="field" id="ploc" placeholder="${lost ? 'Where did you lose it?' : 'Where did you find it?'}">
     <select class="field" id="pzone"><option value="">Preferred hand-off spot</option>${ZONES.map(z => `<option>${z}</option>`).join('')}</select></section>
-  <section class="fcard"><h3>${lost ? 'Secret detail (required)' : 'Secret question (required)'}</h3>
-    ${lost
-      ? `<input class="field" id="pq" placeholder="e.g. What sticker is on the back?"><input class="field" id="pa" placeholder="The answer (a finder must get it right)"><div class="hint">A finder must answer this and send a live proof photo before you see their contact.</div>`
-      : `<input class="field" id="pq" placeholder="e.g. What colour is the phone case?"><input class="field" id="pa" placeholder="The answer (only you see it)"><div class="hint">The owner must answer this to claim the item.</div>`}</section>
+  ${lost
+    ? `<section class="fcard"><h3>Secret detail (required)</h3><input class="field" id="pq" placeholder="e.g. What sticker is on the back?"><input class="field" id="pa" placeholder="The answer (a finder must get it right)"><div class="hint">A finder must answer this and send a live proof photo before you see their contact.</div></section>`
+    : `<section class="fcard"><h3>Ownership questions (required)</h3>
+        <div class="hint" style="margin:0 0 10px">Take a private photo of a hidden detail: the back, inside, stickers or marks. It is read once to write questions, then thrown away. It is never shown or saved.</div>
+        <button class="btn alt" data-act="vcam" style="margin:0">${vdraft ? 'Retake verification photo' : 'Take verification photo'}</button>
+        <input id="vcamin" type="file" accept="image/*" capture="environment" hidden>
+        <div id="vlist"></div></section>`}
   <button class="btn" data-act="post" id="postBtn" style="margin-top:0">Post ${lost ? 'lost item' : 'found item'}</button>`;
   ['pcam', 'pgal'].forEach(id => { $(id).onchange = () => { const f = $(id).files[0]; if (f) { photoFile = f; showPhoto(); } $(id).value = ''; }; });
   if (photoFile) showPhoto();
+  if ($('vcamin')) $('vcamin').onchange = () => { const f = $('vcamin').files[0]; $('vcamin').value = ''; if (f) genQs(f); };
+  renderVList();
 }
+let vdraft = null; // { id, qs:[{slot, question, answer, left, use}] } from the AI, for the found item being reported
+async function toB64(file, maxDim = 1024, q = 0.72) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const bytes = new Uint8Array(await (await new Promise(r => c.toBlob(r, 'image/jpeg', q))).arrayBuffer());
+  let bin = ''; for (let n = 0; n < bytes.length; n += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(n, n + 0x8000));
+  return btoa(bin);
+}
+function renderVList() {
+  const el = $('vlist'); if (!el) return;
+  if (!vdraft) { el.innerHTML = ''; return; }
+  el.innerHTML = vdraft.qs.map(x => `<div class="qcard">
+    <label class="qhead"><input type="checkbox" data-act="quse" data-slot="${x.slot}" ${x.use ? 'checked' : ''}><span>${esc(x.question)}</span></label>
+    <input class="field" data-ans="${x.slot}" value="${esc(x.answer)}" placeholder="Answer" ${x.use ? '' : 'disabled'}>
+    <button class="link" data-act="qregen" data-slot="${x.slot}" ${x.left ? '' : 'disabled'}>${x.left ? `Change this question (${x.left} left)` : 'No changes left'}</button></div>`).join('')
+    + '<div class="hint" style="margin-top:10px">Use at least 2. Check each answer against the item and correct it if needed. The owner must answer these to claim the item.</div>';
+}
+async function genQs(file) {
+  const title = $('ptitle').value.trim();
+  if (title.length < 2) return toast('Enter what the item is first', true);
+  const btn = document.querySelector('[data-act=vcam]'); btn.disabled = true; btn.textContent = 'Reading details…';
+  try {
+    const d = await api('/api/questions/generate', 'POST', { image_b64: await toB64(file), category: rCat, title });
+    vdraft = { id: d.draft_id, qs: d.questions.map(x => ({ ...x, use: true })) }; renderVList();
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; btn.textContent = vdraft ? 'Retake verification photo' : 'Take verification photo';
+}
+async function regenQ(slot, btn) {
+  btn.disabled = true;
+  try {
+    const d = await api('/api/questions/regenerate', 'POST', { draft_id: vdraft.id, slot });
+    Object.assign(vdraft.qs[slot], { question: d.question, answer: d.answer, left: d.left }); renderVList();
+  } catch (e) { toast(e.message, true); btn.disabled = false; }
+}
+document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.ans; if (k !== undefined && vdraft && vdraft.qs[+k]) vdraft.qs[+k].answer = e.target.value; });
+
 let photoFile = null;
 function showPhoto() { $('photoBox').innerHTML = `<img src="${URL.createObjectURL(photoFile)}" alt="">`; }
 async function postItem(btn) {
   const file = photoFile;
   if (!file && rKind === 'FOUND') return toast('Add a photo of the item you found', true);
+  let picks = null;
+  if (rKind === 'FOUND') {
+    if (!vdraft) return toast('Take the verification photo so we can write the ownership questions', true);
+    picks = vdraft.qs.filter(x => x.use && x.answer.trim()).map(x => ({ slot: x.slot, answer: x.answer.trim() }));
+    if (picks.length < 2) return toast('Use at least 2 questions and fill in their answers', true);
+  }
   btn.disabled = true; btn.textContent = file ? 'Uploading photo…' : 'Posting…';
   try {
     const image_url = file ? await uploadImage(file) : null;
     btn.textContent = 'Checking item…';
     await api('/api/items', 'POST', { type: rKind, category: rCat, title: $('ptitle').value, description: $('pdesc').value,
       identifier: $('pid').value, location: $('ploc').value, handoff_zone: $('pzone').value, image_url,
-      security_question: $('pq')?.value, security_answer: $('pa')?.value });
-    photoFile = null; toast('Posted. Thank you!'); filt = { type:'', category:'', q:'' }; $('q').value = ''; go('browse');
+      ...(rKind === 'FOUND' ? { draft_id: vdraft.id, picks } : { security_question: $('pq')?.value, security_answer: $('pa')?.value }) });
+    photoFile = null; vdraft = null; toast('Posted. Thank you!'); filt = { type:'', category:'', q:'' }; $('q').value = ''; go('browse');
   } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Post item'; }
 }
 
@@ -362,8 +496,16 @@ const kindTag = (t) => `<span class="kind ${esc(t)}">${t === 'FOUND' ? 'Found' :
 const emptyBox = (title, text, extra = '') => `<div class="empty">${boxIcon}<b>${title}</b>${text}${extra}</div>`;
 async function viewClaims() {
   setBar('Claims');
-  $('app').innerHTML = `<div class="sect">Waiting for your review</div><div id="cl"><div class="sk row"></div></div>
+  $('app').innerHTML = `<div id="cr"></div><div class="sect">Waiting for your review</div><div id="cl"><div class="sk row"></div></div>
     <div class="sect" style="margin-top:18px">Items you claimed</div><div id="cd"><div class="sk row"></div></div>`;
+  api('/api/my/contact-requests').then(r => {
+    if (!r.length) return;
+    $('cr').innerHTML = '<div class="sect">Asking to clarify</div>' + r.map(x => `<article class="item">${thumbHtml(null, 'OTHER')}<div class="ibody">
+      <div class="irow"><span class="kind FOUND">Found</span><span class="when">${ago(x.created_at)}</span></div>
+      <div class="ititle">${esc(x.title)}</div>
+      <div class="imeta wrap"><span>${esc(x.full_name)} could not answer (${x.attempts} tries) and shared <a href="tel:${esc(x.phone)}" style="color:var(--primary);font-weight:600">${esc(x.phone)}</a></span></div>
+      <div class="iacts"><button class="pbtn" data-act="crapprove" data-id="${x.id}">Approve as owner</button><button class="pbtn alt" data-act="crdismiss" data-id="${x.id}">Dismiss</button></div></div></article>`).join('') + '<div style="height:10px"></div>';
+  }).catch(() => {});
   api('/api/my/claims').then(c => {
     $('cl').innerHTML = (c.some(x => x.item_type === 'LOST') ? '<div class="hint" style="margin:0 2px 10px">Tap a photo to enlarge it. A real proof shows your item next to a handwritten code.</div>' : '') + (c.length ? c.map(x => `<article class="item">${thumbHtml(x.proof_url, 'OTHER')}
       <div class="ibody"><div class="irow">${kindTag(x.item_type)}<span class="when">${ago(x.created_at)}</span></div>
@@ -413,6 +555,15 @@ async function foundItGo(btn) {
     const d = await api(`/api/items/${proof.id}/found-it`, 'POST', { answer, proof_url, identifier: $('fid')?.value, code: proof.code });
     closeSheet(); toast(d.message); loadFeed();
   } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Send to owner'; }
+}
+function crApproveSheet(id) {
+  openSheet(`<h2>Approve this person as the owner?</h2><p>Only approve after you have spoken to them and you are sure it is theirs. They will then see your phone number.</p>
+    <button class="btn" data-act="crapprovego" data-id="${id}">Yes, approve</button><button class="btn alt" data-act="closesheet">Cancel</button>`);
+}
+async function crDecide(id, act, btn) {
+  if (btn) btn.disabled = true;
+  try { const d = await api(`/api/contact-requests/${id}/${act}`, 'PATCH'); closeSheet(); toast(d.message); viewClaims(); }
+  catch (e) { toast(e.message, true); if (btn) btn.disabled = false; }
 }
 function gotItSheet(id) {
   openSheet(`<h2>Did you get it back?</h2><p>Only confirm after the item is in your hands. This closes the post and can't be undone.</p>
@@ -562,7 +713,7 @@ async function regResend(btn) {
 function applyAuthState() { document.body.classList.toggle('authed', !!token); }
 function endSession(msg) {
   token = null; user = null; localStorage.removeItem('token'); localStorage.removeItem('user');
-  tab = 'browse'; filt = { type:'', category:'', q:'' }; $('q').value = '';
+  tab = 'browse'; depth = 0; curState = { v: 'browse', d: 0 }; history.replaceState(curState, ''); filt = { type:'', category:'', q:'' }; $('q').value = '';
   applyAuthState(); authSheet('login', msg);
 }
 function logout() { endSession('You have been logged out.'); }
@@ -701,7 +852,7 @@ document.addEventListener('click', e => {
     rKind = v; viewReport();
     ['ptitle','pdesc','pid','ploc','pzone'].forEach((k, n) => { $(k).value = keep[n]; });
   }
-  else if (act === 'rcat') { rCat = v; t.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); }
+  else if (act === 'rcat') { if (vdraft && rCat !== v) { vdraft = null; renderVList(); toast('Category changed. Retake the verification photo.'); } rCat = v; t.parentElement.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === t)); }
   else if (act === 'post') postItem(t);
   else if (act === 'approve' || act === 'reject') decide(id, act);
   else if (act === 'login') authSheet('login');
@@ -726,14 +877,22 @@ document.addEventListener('click', e => {
   else if (act === 'foundit') { if (!token) authSheet('login', 'Log in first'); else foundItSheet(id); }
   else if (act === 'proofcam') $('pcam2').click();
   else if (act === 'proofgo') foundItGo(t);
+  else if (act === 'vcam') $('vcamin').click();
+  else if (act === 'quse') { vdraft.qs[+t.dataset.slot].use = t.checked; renderVList(); }
+  else if (act === 'qregen') regenQ(+t.dataset.slot, t);
+  else if (act === 'sharenum') shareNum(id, t);
+  else if (act === 'crapprove') crApproveSheet(id);
+  else if (act === 'crapprovego') crDecide(id, 'approve', t);
+  else if (act === 'crdismiss') crDecide(id, 'dismiss', t);
   else if (act === 'gotit') gotItSheet(id);
   else if (act === 'gotitgo') gotItGo(id, t);
-  else if (act === 'privacy') viewPrivacy();
+  else if (act === 'privacy') nav('privacy');
+  else if (act === 'goback') history.back();
   else if (act === 'editprof') editProfSheet();
   else if (act === 'profsave') saveProfile(t);
   else if (act === 'export') exportData();
   else if (act === 'retryacct') viewAccount();
-  else if (act === 'mine') viewMine();
+  else if (act === 'mine') nav('mine');
   else if (act === 'markret') markReturned(id);
   else if (act === 'report') reportSheet(id);
   else if (act === 'rgo') sendReport(id, v);
@@ -742,11 +901,13 @@ document.addEventListener('click', e => {
   else if (act === 'freset') forgotReset(t);
   else if (act === 'chpw') chpwSheet();
   else if (act === 'chpwgo') chpwGo(t);
-  else if (act === 'admin') viewAdmin();
+  else if (act === 'admin') nav('admin');
   else if (act === 'hide' || act === 'unhide' || act === 'adel') adminAct(act, id);
 });
 
+history.replaceState(curState, '');
 applyAuthState();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (token) go('browse'); else authSheet('login', 'Log in with your student account to continue.');
 </script>
 </body>
