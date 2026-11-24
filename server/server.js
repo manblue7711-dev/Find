@@ -12,10 +12,12 @@ const app = express();
 app.set('trust proxy', 1); // Render sits behind a proxy; lets rate limits see each user's real IP
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false }, // Docker's local Postgres has no SSL
 });
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
+const { norm, maskId, ghPhone, phonesCollide, attemptsLeft, isLocked, canResolve, createSecrets } = require('./lib');
+const { proofCode, idHash, encAns, decAns } = createSecrets(JWT_SECRET, process.env.DATA_KEY);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_ORIGIN || '*' }));
@@ -27,20 +29,6 @@ const strict = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 // ---------- helpers ----------
 const wrap = (fn) => (req, res) =>
   fn(req, res).catch((e) => { console.error(e); res.status(500).json({ error: 'Server error' }); });
-
-const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-
-// PS/CSC/22/1234 -> PS/CSC/22/****  (keeps prefix, hides the last segment)
-function maskId(id) {
-  if (!id) return null;
-  const s = String(id).trim();
-  if (s.includes('/')) {
-    const parts = s.split('/');
-    parts[parts.length - 1] = '*'.repeat(Math.max(4, parts[parts.length - 1].length));
-    return parts.join('/');
-  }
-  return s.length <= 4 ? '****' : s.slice(0, 2) + '*'.repeat(s.length - 4) + s.slice(-2);
-}
 
 // Checks the token AND that its version still matches the user's, so
 // "sign out of all devices" and password changes cancel old sessions.
@@ -61,13 +49,6 @@ async function auth(req, res, next) {
 }
 
 // ---------- SMS alerts (Arkesel) ----------
-function ghPhone(p) {
-  const d = String(p || '').replace(/\D/g, '');
-  if (d.startsWith('233') && d.length === 12) return d;
-  if (d.startsWith('0') && d.length === 10) return '233' + d.slice(1);
-  return null;
-}
-
 async function sendSms(phones, message) {
   const key = process.env.ARKESEL_API_KEY;
   const recipients = [...new Set(phones.map(ghPhone).filter(Boolean))];
@@ -273,15 +254,6 @@ ${imageUrl ? '2. photo_ok: the photo clearly shows the item named in the title, 
 
 // ---------- proof that a finder really holds a LOST item ----------
 // 1) the owner's secret question  2) for ID cards, the full ID number  3) a live photo showing a one-off code.
-const CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I
-function proofCode(itemId, userId, daysAgo = 0) {
-  const day = new Date(Date.now() - daysAgo * 864e5).toISOString().slice(0, 10);
-  const h = crypto.createHmac('sha256', JWT_SECRET).update(`${itemId}:${userId}:${day}`).digest();
-  return Array.from(h.subarray(0, 4), (b) => CODE_ALPHA[b % CODE_ALPHA.length]).join('');
-}
-const idHash = (id) => crypto.createHmac('sha256', JWT_SECRET)
-  .update(String(id || '').toUpperCase().replace(/[^A-Z0-9]/g, '')).digest('hex');
-
 async function claudeJson(content, maxTokens = 250) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -325,20 +297,6 @@ Reply with JSON only: {"photo_ok":true|false,"code_ok":true|false,"reason":"one 
 // The finder takes a PRIVATE photo of a hidden detail. It is read once by Claude, kept only in memory
 // for 30 minutes, then discarded. It is never uploaded to Cloudinary or shown to anyone.
 // Answers are stored encrypted (AES-256-GCM) so they can be judged for meaning, not just spelling.
-const ANSWER_KEY = crypto.createHash('sha256').update('answers:' + (process.env.DATA_KEY || JWT_SECRET)).digest();
-function encAns(text) {
-  const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', ANSWER_KEY, iv);
-  const enc = Buffer.concat([c.update(String(text), 'utf8'), c.final()]);
-  return Buffer.concat([iv, c.getAuthTag(), enc]).toString('base64');
-}
-function decAns(b64) {
-  const b = Buffer.from(b64, 'base64');
-  const d = crypto.createDecipheriv('aes-256-gcm', ANSWER_KEY, b.subarray(0, 12));
-  d.setAuthTag(b.subarray(12, 28));
-  return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8');
-}
-
 const drafts = new Map(); // draftId -> { userId, image, category, title, qs, regen, expires }
 setInterval(() => { const n = Date.now(); for (const [k, v] of drafts) if (v.expires < n) drafts.delete(k); }, 60000).unref();
 
@@ -414,7 +372,7 @@ app.get('/api/items/:id/questions', auth, wrap(async (req, res) => {
   const failed = (await pool.query(
     "SELECT count(*)::int AS n FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='REJECTED' AND created_at > now() - interval '24 hours'",
     [it.id, req.user.id])).rows[0].n;
-  const base = { attempts_left: Math.max(0, 3 - failed), locked: failed >= 3 };
+  const base = { attempts_left: attemptsLeft(failed), locked: isLocked(failed) };
   const qs = (await pool.query('SELECT id, question FROM item_questions WHERE item_id=$1 ORDER BY position', [it.id])).rows;
   if (qs.length) return res.json({ mode: 'multi', questions: qs, ...base });
   const v = (await pool.query('SELECT security_question FROM verifications WHERE item_id=$1', [it.id])).rows[0]; // older posts
@@ -489,13 +447,13 @@ app.post('/api/items/:id/claim', auth, strict, wrap(async (req, res) => {
   if (item.type !== 'FOUND') return res.status(400).json({ error: 'For a lost item, use "I found this"' });
   if (item.posted_by === req.user.id) return res.status(400).json({ error: 'You posted this item' });
   const ph = (await pool.query('SELECT phone FROM users WHERE id = ANY($1::int[])', [[item.posted_by, req.user.id]])).rows;
-  if (new Set(ph.map((u) => ghPhone(u.phone) || u.phone)).size < 2)
+  if (phonesCollide(ph))
     return res.status(400).json({ error: 'You cannot claim an item posted from your own phone number' });
   if (item.status !== 'OPEN') return res.status(409).json({ error: 'Someone has already claimed this item' });
   const failed = (await pool.query(
     "SELECT count(*)::int AS n FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='REJECTED' AND created_at > now() - interval '24 hours'",
     [item.id, req.user.id])).rows[0].n;
-  if (failed >= 3)
+  if (isLocked(failed))
     return res.status(429).json({ error: 'Too many wrong attempts. Try again in 24 hours, or ask the finder to contact you.', attempts_left: 0, locked: true });
 
   let ok = false;
@@ -519,7 +477,7 @@ app.post('/api/items/:id/claim', auth, strict, wrap(async (req, res) => {
 
   if (!ok) {
     await pool.query("INSERT INTO claims (item_id, claimant_id, answer_matched, status) VALUES ($1,$2,false,'REJECTED')", [item.id, req.user.id]);
-    const left = Math.max(0, 2 - failed); // never says which answer was wrong
+    const left = attemptsLeft(failed + 1); // never says which answer was wrong
     return res.status(403).json({ error: left ? 'Some answers did not match.' : 'Some answers did not match. No attempts left.', attempts_left: left, locked: left === 0 });
   }
   // all correct: approved at once, and the finder's contact is revealed to the claimant
@@ -540,7 +498,7 @@ app.post('/api/items/:id/contact-request', auth, strict, wrap(async (req, res) =
   const failed = (await pool.query(
     "SELECT count(*)::int AS n FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='REJECTED' AND created_at > now() - interval '24 hours'",
     [it.id, req.user.id])).rows[0].n;
-  if (failed < 3) return res.status(400).json({ error: 'Use your attempts first' });
+  if (!isLocked(failed)) return res.status(400).json({ error: 'Use your attempts first' });
   const ins = await pool.query('INSERT INTO contact_requests (item_id, requester_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING id', [it.id, req.user.id]);
   if (ins.rows[0]) {
     pool.query('SELECT phone FROM users WHERE id=$1', [it.posted_by])
@@ -649,16 +607,14 @@ app.patch('/api/items/:id/resolve', auth, wrap(async (req, res) => {
   const it = (await pool.query('SELECT type, posted_by, status FROM items WHERE id=$1', [req.params.id])).rows[0];
   if (!it) return res.status(404).json({ error: 'Item not found' });
   const role = (await pool.query('SELECT role FROM users WHERE id=$1', [req.user.id])).rows[0]?.role;
-  let allowed = role === 'admin';
-  if (!allowed && it.type === 'LOST') allowed = it.posted_by === req.user.id;
-  if (!allowed && it.type === 'FOUND' && it.status === 'VERIFIED') {
-    const c = await pool.query("SELECT 1 FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='APPROVED'", [req.params.id, req.user.id]);
-    allowed = !!c.rows[0];
-  }
-  if (!allowed) return res.status(403).json({ error: 'Only the owner can confirm the item was received' });
+  const hasApprovedClaim = it.type === 'FOUND' && it.status === 'VERIFIED' &&
+    !!(await pool.query("SELECT 1 FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='APPROVED'", [req.params.id, req.user.id])).rows[0];
+  if (!canResolve({ role, item: it, userId: req.user.id, hasApprovedClaim }))
+    return res.status(403).json({ error: 'Only the owner can confirm the item was received' });
   await pool.query("UPDATE items SET status='RETURNED' WHERE id=$1", [req.params.id]);
   res.json({ message: 'Marked as returned' });
 }));
+
 
 
 // ---------- my posts ----------
@@ -705,12 +661,12 @@ app.post('/api/items/:id/found-it', auth, checkLimit, wrap(async (req, res) => {
   if (!it) return res.status(404).json({ error: 'Lost item not found' });
   if (it.posted_by === req.user.id) return res.status(400).json({ error: 'You posted this item' });
   const ph = (await pool.query('SELECT phone FROM users WHERE id = ANY($1::int[])', [[it.posted_by, req.user.id]])).rows;
-  if (new Set(ph.map((u) => ghPhone(u.phone) || u.phone)).size < 2)
+  if (phonesCollide(ph))
     return res.status(400).json({ error: 'You cannot respond to an item posted from your own phone number' });
   if (it.status !== 'OPEN') return res.status(409).json({ error: 'Someone has already responded to this item' });
   const wrong = (await pool.query(
     "SELECT count(*)::int AS n FROM claims WHERE item_id=$1 AND claimant_id=$2 AND status='REJECTED'", [it.id, req.user.id])).rows[0].n;
-  if (wrong >= 3) return res.status(429).json({ error: 'Too many wrong attempts on this item' });
+  if (isLocked(wrong)) return res.status(429).json({ error: 'Too many wrong attempts on this item' });
 
   const { answer, proof_url, identifier, code } = req.body;
   if (!proof_url || !String(proof_url).startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/`))
@@ -826,6 +782,30 @@ app.get('/api/admin/items', auth, admin, wrap(async (req, res) => {
   res.json(r.rows);
 }));
 
+// Numbers for the admin Overview screen.
+app.get('/api/admin/stats', auth, admin, wrap(async (req, res) => {
+  const totals = (await pool.query(`SELECT
+      (SELECT count(*)::int FROM users) AS users,
+      (SELECT count(*)::int FROM items) AS items,
+      (SELECT count(*)::int FROM items WHERE type='FOUND') AS found,
+      (SELECT count(*)::int FROM items WHERE type='LOST') AS lost,
+      (SELECT count(*)::int FROM items WHERE status='RETURNED') AS returned,
+      (SELECT count(*)::int FROM items WHERE status <> 'RETURNED' AND hidden=false AND created_at > now() - interval '60 days') AS active,
+      (SELECT count(*)::int FROM items WHERE hidden=true) AS hidden,
+      (SELECT count(*)::int FROM claims WHERE status='APPROVED') AS claims_approved,
+      (SELECT count(*)::int FROM claims WHERE status='REJECTED') AS claims_rejected,
+      (SELECT count(DISTINCT item_id)::int FROM reports) AS reported_items`)).rows[0];
+  const per_day = (await pool.query(`
+    SELECT to_char(d, 'DD Mon') AS day, coalesce(c.f, 0)::int AS found, coalesce(c.l, 0)::int AS lost
+    FROM generate_series(current_date - 13, current_date, interval '1 day') d
+    LEFT JOIN (SELECT created_at::date AS dd, count(*) FILTER (WHERE type='FOUND') AS f, count(*) FILTER (WHERE type='LOST') AS l
+               FROM items GROUP BY 1) c ON c.dd = d::date
+    ORDER BY d`)).rows;
+  const by_category = (await pool.query('SELECT category, count(*)::int AS n FROM items GROUP BY 1 ORDER BY 2 DESC')).rows;
+  const by_status = (await pool.query('SELECT status, count(*)::int AS n FROM items GROUP BY 1 ORDER BY 2 DESC')).rows;
+  res.json({ totals, per_day, by_category, by_status });
+}));
+
 app.patch('/api/admin/items/:id/hide', auth, admin, wrap(async (req, res) => {
   await pool.query('UPDATE items SET hidden=$1 WHERE id=$2', [!!req.body.hidden, req.params.id]);
   res.json({ message: req.body.hidden ? 'Hidden' : 'Visible again' });
@@ -896,4 +876,5 @@ app.delete('/api/account', auth, strict, wrap(async (req, res) => {
 }));
 
 app.get('/health', (_, res) => res.send('ok'));
-app.listen(process.env.PORT || 3000, () => console.log('API running'));
+if (require.main === module) app.listen(process.env.PORT || 3000, () => console.log('API running'));
+module.exports = { app, pool };
