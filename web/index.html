@@ -205,6 +205,21 @@ button,a,.chip,.item,nav button{touch-action:manipulation}
 .qhead{display:flex;gap:10px;align-items:flex-start;font-weight:600;margin-bottom:8px;cursor:pointer}
 .qhead input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--primary)}
 .qcard .field{margin-bottom:6px}.qcard .link{padding:2px 0}.qcard .link:disabled{opacity:.5;text-decoration:none}
+
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--surface);border-radius:10px;padding:12px 6px;text-align:center;box-shadow:0 1px 3px rgba(16,24,40,.08)}
+.kpi b{display:block;font-size:20px;line-height:1.2}.kpi span{font-size:11px;color:var(--mute)}
+.chart{display:flex;align-items:flex-end;gap:4px;height:140px}
+.bar2{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0}
+.stack{width:100%;display:flex;flex-direction:column;min-height:3px;border-radius:4px 4px 0 0;overflow:hidden;background:var(--chip)}
+.stack i{display:block}.stack i.f{background:var(--green)}.stack i.l{background:var(--lost)}
+.bar2 small{font-size:10px;color:var(--mute);height:16px;line-height:16px}
+.legend{display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--mute)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.legend i.f{background:var(--green)}.legend i.l{background:var(--lost)}
+.hbar{display:grid;grid-template-columns:84px 1fr 28px;gap:8px;align-items:center;margin:8px 0;font-size:13px}
+.hbar div{background:var(--chip);border-radius:6px;height:10px;overflow:hidden}
+.hbar i{display:block;height:100%;background:var(--green);border-radius:6px}.hbar b{text-align:right}
 </style>
 </head>
 <body>
@@ -805,9 +820,29 @@ async function chpwGo(btn) {
 }
 
 // ---------- admin ----------
+let adminTab = 'overview';
 async function viewAdmin() {
   setBar('Admin panel', true);
-  $('app').innerHTML = '<div id="al"><div class="sk row"></div></div>';
+  $('app').innerHTML = `<div class="seg"><button class="${adminTab === 'overview' ? 'on' : ''}" data-act="admintab" data-v="overview">Overview</button><button class="${adminTab === 'posts' ? 'on' : ''}" data-act="admintab" data-v="posts">Posts</button></div>
+    <div id="al"><div class="sk row"></div><div class="sk row"></div></div>`;
+  return adminTab === 'overview' ? adminOverview() : adminPosts();
+}
+async function adminOverview() {
+  try {
+    const d = await api('/api/admin/stats'), t = d.totals;
+    const rate = t.items ? Math.round(100 * t.returned / t.items) : 0;
+    const kpi = (n, l) => `<div class="kpi"><b>${n}</b><span>${l}</span></div>`;
+    const max = Math.max(1, ...d.per_day.map(x => x.found + x.lost));
+    const bars = d.per_day.map((x, i) => `<div class="bar2" title="${esc(x.day)}: ${x.found} found, ${x.lost} lost"><div class="stack" style="height:${Math.round(100 * (x.found + x.lost) / max)}%"><i class="l" style="flex:${x.lost}"></i><i class="f" style="flex:${x.found}"></i></div><small>${i % 3 === 0 ? esc(x.day.split(' ')[0]) : ''}</small></div>`).join('');
+    const cmax = Math.max(1, ...d.by_category.map(x => x.n));
+    const cats = d.by_category.map(x => `<div class="hbar"><span>${esc(CATS[x.category] || x.category)}</span><div><i style="width:${Math.round(100 * x.n / cmax)}%"></i></div><b>${x.n}</b></div>`).join('');
+    $('al').innerHTML = `<div class="kpis">${kpi(t.users, 'Students')}${kpi(t.items, 'Posts')}${kpi(t.active, 'Active now')}${kpi(t.returned, 'Returned')}${kpi(rate + '%', 'Return rate')}${kpi(t.claims_approved, 'Approved claims')}</div>
+      <div class="fcard"><h3>Posts, last 14 days</h3><div class="chart">${bars}</div><div class="legend"><span><i class="f"></i>Found ${t.found}</span><span><i class="l"></i>Lost ${t.lost}</span></div></div>
+      <div class="fcard"><h3>By category</h3>${cats || '<div class="hint" style="margin:0">No posts yet.</div>'}</div>
+      <div class="fcard"><h3>Moderation</h3>${prow('Reported posts', t.reported_items)}${prow('Hidden posts', t.hidden)}${prow('Wrong claim attempts', t.claims_rejected)}</div>`;
+  } catch (e) { $('al').innerHTML = emptyBox("Can't load statistics", esc(e.message)); }
+}
+async function adminPosts() {
   try {
     const a = await api('/api/admin/items');
     $('al').innerHTML = a.length ? a.map(x => `<article class="item">${thumbHtml(null, 'OTHER')}<div class="ibody">
@@ -891,6 +926,7 @@ document.addEventListener('click', e => {
   else if (act === 'crdismiss') crDecide(id, 'dismiss', t);
   else if (act === 'gotit') gotItSheet(id);
   else if (act === 'gotitgo') gotItGo(id, t);
+  else if (act === 'admintab') { adminTab = v; viewAdmin(); }
   else if (act === 'privacy') nav('privacy');
   else if (act === 'goback') history.back();
   else if (act === 'editprof') editProfSheet();
