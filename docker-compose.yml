@@ -1,0 +1,53 @@
+# Run the whole stack on one machine:  cp .env.example .env  (fill it in)  then  docker compose up --build
+#   app  -> http://localhost:8080      api -> http://localhost:3000/health      database -> localhost:5432
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: campus
+      POSTGRES_PASSWORD: campus
+      POSTGRES_DB: campusfind
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      # Files in this folder run once, in name order, when the database is first created.
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./migration.sql:/docker-entrypoint-initdb.d/02-migration.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus -d campusfind"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  api:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://campus:campus@db:5432/campusfind
+      DATABASE_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-}
+      ARKESEL_API_KEY: ${ARKESEL_API_KEY:-}
+      ARKESEL_SENDER: ${ARKESEL_SENDER:-}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      REQUIRE_PHONE_VERIFY: ${REQUIRE_PHONE_VERIFY:-false}
+    ports:
+      - "3000:3000"
+
+  web:
+    image: nginx:alpine
+    depends_on:
+      - api
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+
+volumes:
+  dbdata:
